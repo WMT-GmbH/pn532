@@ -3,9 +3,9 @@
 #![no_std]
 
 use core::fmt::Debug;
-
-pub use crate::protocol::{Error, Frame, Pn532};
 use core::task::Poll;
+
+pub use crate::protocol::{Error, Pn532};
 
 mod protocol;
 pub mod spi;
@@ -85,30 +85,25 @@ pub enum CardType {
     Jewel = 0x04,
 }
 
-impl Frame<9> {
-    pub const GET_FIRMWARE_VERSION: Frame<9> = Frame::make(&[Command::GetFirmwareVersion as u8]);
-}
-impl Frame<11> {
-    pub const INLIST_ONE_ISO_A_TARGET: Frame<11> = Frame::make(&[
-        Command::InListPassiveTarget as u8,
-        1,
-        CardType::IsoTypeA as u8,
-    ]);
-}
-impl Frame<12> {
-    /// Make a SAMConfiguration frame
-    pub const fn sam_configuration(mode: SAMMode, use_irq_pin: bool) -> Frame<12> {
-        let (mode, timeout) = match mode {
-            SAMMode::Normal => (1, 0),
-            SAMMode::VirtualCard { timeout } => (2, timeout),
-            SAMMode::WiredCard => (3, 0),
-            SAMMode::DualCard => (4, 0),
-        };
-        Frame::make(&[
-            Command::SAMConfiguration as u8,
-            mode,
-            timeout,
-            !use_irq_pin as u8,
-        ])
-    }
+pub const GET_FIRMWARE_VERSION: [u8; 1 + 8] =
+    Pn532::make_frame(&[Command::GetFirmwareVersion as u8]);
+pub const INLIST_ONE_ISO_A_TARGET: [u8; 3 + 8] = Pn532::make_frame(&[
+    Command::InListPassiveTarget as u8,
+    1,
+    CardType::IsoTypeA as u8,
+]);
+/// Make a SAMConfiguration frame
+pub const fn sam_configuration_frame(mode: SAMMode, use_irq_pin: bool) -> [u8; 4 + 8] {
+    let (mode, timeout) = match mode {
+        SAMMode::Normal => (1, 0),
+        SAMMode::VirtualCard { timeout } => (2, timeout),
+        SAMMode::WiredCard => (3, 0),
+        SAMMode::DualCard => (4, 0),
+    };
+    Pn532::make_frame(&[
+        Command::SAMConfiguration as u8,
+        mode,
+        timeout,
+        !use_irq_pin as u8,
+    ])
 }

@@ -27,7 +27,7 @@ impl<E: Debug> From<E> for Error<E> {
     }
 }
 
-pub struct Pn532<'i, I: Interface>(&'i mut I);
+pub struct Pn532<'i, I>(&'i mut I);
 
 impl<I: Interface> Pn532<'_, I> {
     // False positive: https://github.com/rust-lang/rust-clippy/issues/5787
@@ -92,16 +92,14 @@ impl<I: Interface> Pn532<'_, I> {
     }
 }
 
-pub struct Frame<const N: usize>([u8; N]);
-
-impl<const N: usize> Frame<N> {
+impl Pn532<'_, ()> {
     /// N = data.len() + 8
-    pub const fn make(data: &[u8]) -> Self {
+    pub const fn make_frame<const N: usize>(data: &[u8]) -> [u8; N] {
         if data.len() + 8 != N {
             panic!("N should be data.len() + 8");
         }
 
-        let mut frame = Frame([0; N]);
+        let mut frame = [0; N];
 
         let frame_len = data.len() as u8 + 1; // data + frame identifier
 
@@ -109,7 +107,7 @@ impl<const N: usize> Frame<N> {
         let mut i = 0;
         while i < data.len() {
             data_sum = data_sum.wrapping_add(data[i]);
-            frame.0[6 + i] = data[i];
+            frame[6 + i] = data[i];
             i += 1;
         }
 
@@ -117,75 +115,15 @@ impl<const N: usize> Frame<N> {
             (!sum).wrapping_add(1)
         }
 
-        frame.0[0] = PREAMBLE[0];
-        frame.0[1] = PREAMBLE[1];
-        frame.0[2] = PREAMBLE[2];
-        frame.0[3] = frame_len;
-        frame.0[4] = to_checksum(frame_len);
-        frame.0[5] = HOSTTOPN532;
-        frame.0[6 + data.len()] = to_checksum(data_sum);
-        frame.0[7 + data.len()] = POSTAMBLE;
+        frame[0] = PREAMBLE[0];
+        frame[1] = PREAMBLE[1];
+        frame[2] = PREAMBLE[2];
+        frame[3] = frame_len;
+        frame[4] = to_checksum(frame_len);
+        frame[5] = HOSTTOPN532;
+        frame[6 + data.len()] = to_checksum(data_sum);
+        frame[7 + data.len()] = POSTAMBLE;
         frame
-    }
-
-    // False positive: https://github.com/rust-lang/rust-clippy/issues/5787
-    #[allow(clippy::needless_lifetimes)]
-    pub async fn process_async<'a, I: Interface>(
-        &self,
-        interface: &mut I,
-        response_buf: &'a mut [u8],
-    ) -> Result<&'a [u8], Error<I::Error>> {
-        interface.write(&self.0)?;
-        core::future::poll_fn(|_| interface.wait_ready()).await?;
-        self.receive_ack(interface)?;
-        core::future::poll_fn(|_| interface.wait_ready()).await?;
-        self.receive_response(interface, response_buf)
-    }
-
-    pub fn process<'a, I: Interface, T: CountDown>(
-        &self,
-        interface: &mut I,
-        response_buf: &'a mut [u8],
-        timeout: &mut T,
-    ) -> Result<&'a [u8], Error<I::Error>> {
-        interface.write(&self.0)?;
-        while interface.wait_ready()?.is_pending() {
-            if timeout.wait().is_ok() {
-                return Err(Error::Timeout);
-            }
-        }
-        self.receive_ack(interface)?;
-        while interface.wait_ready()?.is_pending() {
-            if timeout.wait().is_ok() {
-                return Err(Error::Timeout);
-            }
-        }
-        self.receive_response(interface, response_buf)
-    }
-
-    pub fn send<I: Interface>(&self, interface: &mut I) -> Result<(), Error<I::Error>> {
-        interface.write(&self.0)?;
-        Ok(())
-    }
-
-    pub fn receive_ack<I: Interface>(&self, interface: &mut I) -> Result<(), Error<I::Error>> {
-        let mut ack_buf = [0; 6];
-        interface.read(&mut ack_buf)?;
-        if ack_buf != ACK {
-            Err(Error::NACK)
-        } else {
-            Ok(())
-        }
-    }
-
-    pub fn receive_response<'a, I: Interface>(
-        &self,
-        interface: &mut I,
-        response_buf: &'a mut [u8],
-    ) -> Result<&'a [u8], Error<I::Error>> {
-        interface.read(response_buf)?;
-        let expected_response_command = self.0[6] + 1;
-        parse_response(response_buf, expected_response_command)
     }
 }
 
