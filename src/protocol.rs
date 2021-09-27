@@ -1,5 +1,6 @@
 use crate::Interface;
 use core::fmt::Debug;
+use embedded_hal::timer::CountDown;
 
 const PREAMBLE: [u8; 3] = [0x00, 0x00, 0xFF];
 const POSTAMBLE: u8 = 0x00;
@@ -62,19 +63,45 @@ impl<const N: usize> Frame<N> {
 
     // False positive: https://github.com/rust-lang/rust-clippy/issues/5787
     #[allow(clippy::needless_lifetimes)]
-    pub async fn process<'a, I: Interface>(
+    pub async fn process_async<'a, I: Interface>(
         &self,
         interface: &mut I,
         response_buf: &'a mut [u8],
     ) -> Result<&'a [u8], Error<I::Error>> {
         interface.write(&self.0)?;
-        self.receive_ack(interface).await?;
-        self.receive_response(interface, response_buf).await
+        core::future::poll_fn(|_| interface.wait_ready()).await?;
+        self.receive_ack(interface)?;
+        core::future::poll_fn(|_| interface.wait_ready()).await?;
+        self.receive_response(interface, response_buf)
     }
 
-    async fn receive_ack<I: Interface>(&self, interface: &mut I) -> Result<(), Error<I::Error>> {
-        interface.wait_ready().await?;
+    pub fn process<'a, I: Interface, T: CountDown>(
+        &self,
+        interface: &mut I,
+        response_buf: &'a mut [u8],
+        timeout: &mut T,
+    ) -> Result<&'a [u8], Error<I::Error>> {
+        interface.write(&self.0)?;
+        while interface.wait_ready()?.is_pending() {
+            if timeout.wait().is_ok() {
+                return Err(Error::Timeout);
+            }
+        }
+        self.receive_ack(interface)?;
+        while interface.wait_ready()?.is_pending() {
+            if timeout.wait().is_ok() {
+                return Err(Error::Timeout);
+            }
+        }
+        self.receive_response(interface, response_buf)
+    }
 
+    pub fn send<I: Interface>(&self, interface: &mut I) -> Result<(), Error<I::Error>> {
+        interface.write(&self.0)?;
+        Ok(())
+    }
+
+    pub fn receive_ack<I: Interface>(&self, interface: &mut I) -> Result<(), Error<I::Error>> {
         let mut ack_buf = [0; 6];
         interface.read(&mut ack_buf)?;
         if ack_buf != ACK {
@@ -84,15 +111,11 @@ impl<const N: usize> Frame<N> {
         }
     }
 
-    // False positive: https://github.com/rust-lang/rust-clippy/issues/5787
-    #[allow(clippy::needless_lifetimes)]
-    async fn receive_response<'a, I: Interface>(
+    pub fn receive_response<'a, I: Interface>(
         &self,
         interface: &mut I,
         response_buf: &'a mut [u8],
     ) -> Result<&'a [u8], Error<I::Error>> {
-        interface.wait_ready().await?;
-
         interface.read(response_buf)?;
         let expected_response_command = self.0[6] + 1;
         parse_response(response_buf, expected_response_command)

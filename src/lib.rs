@@ -1,11 +1,11 @@
 #![feature(const_panic)]
-#![feature(generic_associated_types)]
+#![feature(future_poll_fn)]
 #![no_std]
 
 use core::fmt::Debug;
-use core::future::Future;
 
 pub use crate::protocol::{Error, Frame};
+use core::task::Poll;
 
 mod protocol;
 pub mod spi;
@@ -13,13 +13,8 @@ pub mod tag;
 
 pub trait Interface {
     type Error: Debug;
-    type WaitReadyFuture<'a>: Future<Output = Result<(), Self::Error>>
-    where
-        Self: 'a;
     fn write(&mut self, frame: &[u8]) -> Result<(), Self::Error>;
-
-    /// should be `async fn wait_ready(&mut self) -> Result<(), Self::Error>;`
-    fn wait_ready(&mut self) -> Self::WaitReadyFuture<'_>;
+    fn wait_ready(&mut self) -> Poll<Result<(), Self::Error>>;
     fn read(&mut self, buf: &mut [u8]) -> Result<(), Self::Error>;
 }
 
