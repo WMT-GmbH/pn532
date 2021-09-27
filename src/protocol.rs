@@ -1,6 +1,8 @@
-use crate::Interface;
 use core::fmt::Debug;
+
 use embedded_hal::timer::CountDown;
+
+use crate::Interface;
 
 const PREAMBLE: [u8; 3] = [0x00, 0x00, 0xFF];
 const POSTAMBLE: u8 = 0x00;
@@ -22,6 +24,71 @@ pub enum Error<E: Debug> {
 impl<E: Debug> From<E> for Error<E> {
     fn from(e: E) -> Self {
         Error::InterfaceError(e)
+    }
+}
+
+pub struct Pn532<'i, I: Interface>(&'i mut I);
+
+impl<I: Interface> Pn532<'_, I> {
+    // False positive: https://github.com/rust-lang/rust-clippy/issues/5787
+    #[allow(clippy::needless_lifetimes)]
+    pub async fn process_async<'a>(
+        &mut self,
+        frame: &[u8],
+        response_buf: &'a mut [u8],
+    ) -> Result<&'a [u8], Error<I::Error>> {
+        self.0.write(frame)?;
+        core::future::poll_fn(|_| self.0.wait_ready()).await?;
+        self.receive_ack()?;
+        core::future::poll_fn(|_| self.0.wait_ready()).await?;
+        self.receive_response(frame[6], response_buf)
+    }
+
+    pub fn process<'a, T: CountDown>(
+        &mut self,
+        frame: &[u8],
+        response_buf: &'a mut [u8],
+        timeout: &mut T,
+    ) -> Result<&'a [u8], Error<I::Error>> {
+        self.0.write(frame)?;
+        while self.0.wait_ready()?.is_pending() {
+            if timeout.wait().is_ok() {
+                return Err(Error::Timeout);
+            }
+        }
+        self.receive_ack()?;
+        while self.0.wait_ready()?.is_pending() {
+            if timeout.wait().is_ok() {
+                return Err(Error::Timeout);
+            }
+        }
+        self.receive_response(frame[6], response_buf)
+    }
+
+    pub fn send(&mut self, frame: &[u8]) -> Result<(), Error<I::Error>> {
+        self.0.write(frame)?;
+        Ok(())
+    }
+
+    pub fn receive_ack(&mut self) -> Result<(), Error<I::Error>> {
+        let mut ack_buf = [0; 6];
+        self.0.read(&mut ack_buf)?;
+        if ack_buf != ACK {
+            Err(Error::NACK)
+        } else {
+            Ok(())
+        }
+    }
+
+    /// frame[6]
+    pub fn receive_response<'a>(
+        &mut self,
+        seventh_frame_byte: u8,
+        response_buf: &'a mut [u8],
+    ) -> Result<&'a [u8], Error<I::Error>> {
+        self.0.read(response_buf)?;
+        let expected_response_command = seventh_frame_byte + 1;
+        parse_response(response_buf, expected_response_command)
     }
 }
 

@@ -4,7 +4,7 @@
 
 use core::fmt::Debug;
 
-pub use crate::protocol::{Error, Frame};
+pub use crate::protocol::{Error, Frame, Pn532};
 use core::task::Poll;
 
 mod protocol;
