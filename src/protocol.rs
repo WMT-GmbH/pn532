@@ -14,6 +14,7 @@ pub enum Error<E: Debug> {
     BadResponseFrame,
     CrcError,
     BufTooSmall,
+    Timeout,
     InterfaceError(E),
 }
 
@@ -23,26 +24,82 @@ impl<E: Debug> From<E> for Error<E> {
     }
 }
 
-/// response_buf.len() = response.len() + 9
-pub fn send_frame<'a, I: Interface>(
-    interface: &mut I,
-    frame: &[u8],
-    response_buf: &'a mut [u8],
-) -> Result<&'a [u8], Error<I::Error>> {
-    interface.write(frame)?;
-    // TODO wait ready
-    let mut ack_buf = [0; 6];
-    interface.read(&mut ack_buf)?;
-    if ack_buf != ACK {
-        return Err(Error::NACK);
+pub struct Frame<const N: usize>([u8; N]);
+
+impl<const N: usize> Frame<N> {
+    /// N = data.len() + 8
+    pub const fn make(data: &[u8]) -> Self {
+        if data.len() + 8 != N {
+            panic!("N should be data.len() + 8");
+        }
+
+        let mut frame = Frame([0; N]);
+
+        let frame_len = data.len() as u8 + 1; // data + frame identifier
+
+        let mut data_sum = HOSTTOPN532; // sum(data + frame identifier)
+        let mut i = 0;
+        while i < data.len() {
+            data_sum = data_sum.wrapping_add(data[i]);
+            frame.0[6 + i] = data[i];
+            i += 1;
+        }
+
+        const fn to_checksum(sum: u8) -> u8 {
+            (!sum).wrapping_add(1)
+        }
+
+        frame.0[0] = PREAMBLE[0];
+        frame.0[1] = PREAMBLE[1];
+        frame.0[2] = PREAMBLE[2];
+        frame.0[3] = frame_len;
+        frame.0[4] = to_checksum(frame_len);
+        frame.0[5] = HOSTTOPN532;
+        frame.0[6 + data.len()] = to_checksum(data_sum);
+        frame.0[7 + data.len()] = POSTAMBLE;
+        frame
     }
-    // TODO wait ready
-    interface.read(response_buf)?;
-    let expected_response_command = frame[6] + 1;
-    process_response(response_buf, expected_response_command)
+
+    // False positive: https://github.com/rust-lang/rust-clippy/issues/5787
+    #[allow(clippy::needless_lifetimes)]
+    pub async fn process<'a, I: Interface>(
+        &self,
+        interface: &mut I,
+        response_buf: &'a mut [u8],
+    ) -> Result<&'a [u8], Error<I::Error>> {
+        interface.write(&self.0)?;
+        self.receive_ack(interface).await?;
+        self.receive_response(interface, response_buf).await
+    }
+
+    async fn receive_ack<I: Interface>(&self, interface: &mut I) -> Result<(), Error<I::Error>> {
+        interface.wait_ready().await?;
+
+        let mut ack_buf = [0; 6];
+        interface.read(&mut ack_buf)?;
+        if ack_buf != ACK {
+            Err(Error::NACK)
+        } else {
+            Ok(())
+        }
+    }
+
+    // False positive: https://github.com/rust-lang/rust-clippy/issues/5787
+    #[allow(clippy::needless_lifetimes)]
+    async fn receive_response<'a, I: Interface>(
+        &self,
+        interface: &mut I,
+        response_buf: &'a mut [u8],
+    ) -> Result<&'a [u8], Error<I::Error>> {
+        interface.wait_ready().await?;
+
+        interface.read(response_buf)?;
+        let expected_response_command = self.0[6] + 1;
+        parse_response(response_buf, expected_response_command)
+    }
 }
 
-fn process_response<E: Debug>(
+fn parse_response<E: Debug>(
     response_buf: &[u8],
     expected_response_command: u8,
 ) -> Result<&[u8], Error<E>> {
@@ -77,37 +134,4 @@ fn process_response<E: Debug>(
     }
     // Adjust response buf and return it
     Ok(&response_buf[7..5 + frame_len as usize])
-}
-
-/// N = data.len() + 8
-pub const fn make_frame<const N: usize>(data: &[u8]) -> [u8; N] {
-    if data.len() + 8 != N {
-        panic!("N should be data.len() + 8");
-    }
-
-    let mut frame = [0; N];
-
-    let frame_len = data.len() as u8 + 1; // data + frame identifier
-
-    let mut data_sum = HOSTTOPN532; // sum(data + frame identifier)
-    let mut i = 0;
-    while i < data.len() {
-        data_sum = data_sum.wrapping_add(data[i]);
-        frame[6 + i] = data[i];
-        i += 1;
-    }
-
-    frame[0] = PREAMBLE[0];
-    frame[1] = PREAMBLE[1];
-    frame[2] = PREAMBLE[2];
-    frame[3] = frame_len;
-    frame[4] = to_checksum(frame_len);
-    frame[5] = HOSTTOPN532;
-    frame[6 + data.len()] = to_checksum(data_sum);
-    frame[7 + data.len()] = POSTAMBLE;
-    frame
-}
-
-const fn to_checksum(sum: u8) -> u8 {
-    (!sum).wrapping_add(1)
 }

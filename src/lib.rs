@@ -1,16 +1,25 @@
 #![feature(const_panic)]
+#![feature(generic_associated_types)]
 #![no_std]
 
 use core::fmt::Debug;
+use core::future::Future;
 
-pub use crate::protocol::{make_frame, send_frame, Error};
+pub use crate::protocol::{Error, Frame};
 
 mod protocol;
 pub mod spi;
+pub mod tag;
 
 pub trait Interface {
     type Error: Debug;
+    type WaitReadyFuture<'a>: Future<Output = Result<(), Self::Error>>
+    where
+        Self: 'a;
     fn write(&mut self, frame: &[u8]) -> Result<(), Self::Error>;
+
+    /// should be `async fn wait_ready(&mut self) -> Result<(), Self::Error>;`
+    fn wait_ready(&mut self) -> Self::WaitReadyFuture<'_>;
     fn read(&mut self, buf: &mut [u8]) -> Result<(), Self::Error>;
 }
 
@@ -50,11 +59,6 @@ pub enum Command {
     TgGetTargetStatus = 0x8A,
 }
 
-/// Make a GetFirmwareVersion frame.
-pub const fn get_firmware_version_frame() -> [u8; 9] {
-    make_frame(&[Command::GetFirmwareVersion as u8])
-}
-
 pub enum SAMMode {
     /// The SAM is not used; this is the default mode
     Normal,
@@ -72,48 +76,44 @@ pub enum SAMMode {
     DualCard,
 }
 
-/// Make a SAMConfiguration frame.
-pub const fn sam_configuration_frame(mode: SAMMode, use_irq_pin: bool) -> [u8; 12] {
-    let (mode, timeout) = match mode {
-        SAMMode::Normal => (1, 0),
-        SAMMode::VirtualCard { timeout } => (2, timeout),
-        SAMMode::WiredCard => (3, 0),
-        SAMMode::DualCard => (4, 0),
-    };
-    make_frame(&[
-        Command::SAMConfiguration as u8,
-        mode,
-        timeout,
-        !use_irq_pin as u8,
-    ])
-}
-
+#[repr(u8)]
 pub enum CardType {
     /// 106 kbps type A (ISO/IEC14443 Type A)
-    IsoTypeA { max_tag_number: u8 },
+    IsoTypeA = 0x00,
+    /// 212 kbps (FeliCa polling)
+    FeliCa212kbps = 0x01,
+    /// 424 kbps (FeliCa polling)
+    FeliCa424kbps = 0x02,
     /// 106 kbps type B (ISO/IEC14443-3B)
-    IsoTypeB { max_tag_number: u8 },
+    IsoTypeB = 0x03,
     /// 106 kbps Innovision Jewel tag
-    Jewel,
+    Jewel = 0x04,
 }
 
-/// Make a InListPassiveTarget frame.
-///
-/// The InListPassiveTarget also accepts FeliCa cards
-/// and optional (in the case of FeliCa mandatory) "InitiatorData".
-/// Use [`make_frame`] if you need these instead.
-pub const fn inlist_passive_target_frame(card_type: CardType) -> [u8; 11] {
-    let (max_tag_number, baud_rate) = match card_type {
-        CardType::IsoTypeA { max_tag_number } => (max_tag_number, 0x00),
-        CardType::IsoTypeB { max_tag_number } => (max_tag_number, 0x03),
-        CardType::Jewel => (1, 0x00),
-    };
-    if max_tag_number != 1 || max_tag_number != 2 {
-        panic!("max_tag_number must be 1 or 2")
-    }
-    make_frame(&[
+impl Frame<9> {
+    pub const GET_FIRMWARE_VERSION: Frame<9> = Frame::make(&[Command::GetFirmwareVersion as u8]);
+}
+impl Frame<11> {
+    pub const INLIST_ONE_ISO_A_TARGET: Frame<11> = Frame::make(&[
         Command::InListPassiveTarget as u8,
-        max_tag_number,
-        baud_rate,
-    ])
+        1,
+        CardType::IsoTypeA as u8,
+    ]);
+}
+impl Frame<12> {
+    /// Make a SAMConfiguration frame
+    pub const fn sam_configuration(mode: SAMMode, use_irq_pin: bool) -> Frame<12> {
+        let (mode, timeout) = match mode {
+            SAMMode::Normal => (1, 0),
+            SAMMode::VirtualCard { timeout } => (2, timeout),
+            SAMMode::WiredCard => (3, 0),
+            SAMMode::DualCard => (4, 0),
+        };
+        Frame::make(&[
+            Command::SAMConfiguration as u8,
+            mode,
+            timeout,
+            !use_irq_pin as u8,
+        ])
+    }
 }
