@@ -101,25 +101,27 @@ pub enum CardType {
     Jewel = 0x04,
 }
 
-pub const GET_FIRMWARE_VERSION: [u8; 1 + 8] =
-    Pn532::make_frame(&[Command::GetFirmwareVersion as u8]);
-pub const INLIST_ONE_ISO_A_TARGET: [u8; 3 + 8] = Pn532::make_frame(&[
-    Command::InListPassiveTarget as u8,
-    1,
-    CardType::IsoTypeA as u8,
-]);
-/// Make a SAMConfiguration frame
-pub const fn sam_configuration_frame(mode: SAMMode, use_irq_pin: bool) -> [u8; 4 + 8] {
-    let (mode, timeout) = match mode {
-        SAMMode::Normal => (1, 0),
-        SAMMode::VirtualCard { timeout } => (2, timeout),
-        SAMMode::WiredCard => (3, 0),
-        SAMMode::DualCard => (4, 0),
-    };
-    Pn532::make_frame(&[
-        Command::SAMConfiguration as u8,
-        mode,
-        timeout,
-        !use_irq_pin as u8,
-    ])
+impl Pn532<()> {
+    pub const GET_FIRMWARE_VERSION: [u8; 1 + 8] =
+        Pn532::make_frame(&[Command::GetFirmwareVersion as u8]);
+    pub const INLIST_ONE_ISO_A_TARGET: [u8; 3 + 8] = Pn532::make_frame(&[
+        Command::InListPassiveTarget as u8,
+        1,
+        CardType::IsoTypeA as u8,
+    ]);
+    /// Make a SAMConfiguration frame
+    pub const fn sam_configuration_frame(mode: SAMMode, use_irq_pin: bool) -> [u8; 4 + 8] {
+        let (mode, timeout) = match mode {
+            SAMMode::Normal => (1, 0),
+            SAMMode::VirtualCard { timeout } => (2, timeout),
+            SAMMode::WiredCard => (3, 0),
+            SAMMode::DualCard => (4, 0),
+        };
+        Pn532::make_frame(&[
+            Command::SAMConfiguration as u8,
+            mode,
+            timeout,
+            !use_irq_pin as u8,
+        ])
+    }
 }
