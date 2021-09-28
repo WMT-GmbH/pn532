@@ -18,6 +18,22 @@ pub trait Interface {
     fn read(&mut self, buf: &mut [u8]) -> Result<(), Self::Error>;
 }
 
+impl<I: Interface> Interface for &mut I {
+    type Error = I::Error;
+
+    fn write(&mut self, frame: &[u8]) -> Result<(), Self::Error> {
+        I::write(self, frame)
+    }
+
+    fn wait_ready(&mut self) -> Poll<Result<(), Self::Error>> {
+        I::wait_ready(self)
+    }
+
+    fn read(&mut self, buf: &mut [u8]) -> Result<(), Self::Error> {
+        I::read(self, buf)
+    }
+}
+
 #[repr(u8)]
 pub enum Command {
     Diagnose = 0x00,

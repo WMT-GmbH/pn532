@@ -27,9 +27,9 @@ impl<E: Debug> From<E> for Error<E> {
     }
 }
 
-pub struct Pn532<'i, I>(&'i mut I);
+pub struct Pn532<I>(pub I);
 
-impl<I: Interface> Pn532<'_, I> {
+impl<I: Interface> Pn532<I> {
     // False positive: https://github.com/rust-lang/rust-clippy/issues/5787
     #[allow(clippy::needless_lifetimes)]
     pub async fn process_async<'a>(
@@ -92,7 +92,7 @@ impl<I: Interface> Pn532<'_, I> {
     }
 }
 
-impl Pn532<'_, ()> {
+impl Pn532<()> {
     /// N = data.len() + 8
     pub const fn make_frame<const N: usize>(data: &[u8]) -> [u8; N] {
         if data.len() + 8 != N {
