@@ -101,7 +101,7 @@ pub enum CardType {
     Jewel = 0x04,
 }
 
-impl Pn532<()> {
+impl Pn532<(), ()> {
     pub const GET_FIRMWARE_VERSION: [u8; 1 + 8] =
         Pn532::make_frame(&[Command::GetFirmwareVersion as u8]);
     pub const INLIST_ONE_ISO_A_TARGET: [u8; 3 + 8] = Pn532::make_frame(&[
@@ -124,4 +124,6 @@ impl Pn532<()> {
             !use_irq_pin as u8,
         ])
     }
+
+    // TODO power down
 }

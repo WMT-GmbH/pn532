@@ -27,9 +27,35 @@ impl<E: Debug> From<E> for Error<E> {
     }
 }
 
-pub struct Pn532<I>(pub I);
+pub struct Pn532<I, T> {
+    pub interface: I,
+    pub timer: T,
+}
 
-impl<I: Interface> Pn532<I> {
+impl<I: Interface, T: CountDown> Pn532<I, T> {
+    pub fn process<'a>(
+        &mut self,
+        frame: &[u8],
+        response_buf: &'a mut [u8],
+        timeout: T::Time,
+    ) -> Result<&'a [u8], Error<I::Error>> {
+        self.timer.start(timeout);
+        self.interface.write(frame)?;
+        while self.interface.wait_ready()?.is_pending() {
+            if self.timer.wait().is_ok() {
+                return Err(Error::Timeout);
+            }
+        }
+        self.receive_ack()?;
+        while self.interface.wait_ready()?.is_pending() {
+            if self.timer.wait().is_ok() {
+                return Err(Error::Timeout);
+            }
+        }
+        self.receive_response(frame[6], response_buf)
+    }
+}
+impl<I: Interface, T> Pn532<I, T> {
     // False positive: https://github.com/rust-lang/rust-clippy/issues/5787
     #[allow(clippy::needless_lifetimes)]
     pub async fn process_async<'a>(
@@ -37,42 +63,21 @@ impl<I: Interface> Pn532<I> {
         frame: &[u8],
         response_buf: &'a mut [u8],
     ) -> Result<&'a [u8], Error<I::Error>> {
-        self.0.write(frame)?;
-        core::future::poll_fn(|_| self.0.wait_ready()).await?;
+        self.interface.write(frame)?;
+        core::future::poll_fn(|_| self.interface.wait_ready()).await?;
         self.receive_ack()?;
-        core::future::poll_fn(|_| self.0.wait_ready()).await?;
-        self.receive_response(frame[6], response_buf)
-    }
-
-    pub fn process<'a, T: CountDown>(
-        &mut self,
-        frame: &[u8],
-        response_buf: &'a mut [u8],
-        timeout: &mut T,
-    ) -> Result<&'a [u8], Error<I::Error>> {
-        self.0.write(frame)?;
-        while self.0.wait_ready()?.is_pending() {
-            if timeout.wait().is_ok() {
-                return Err(Error::Timeout);
-            }
-        }
-        self.receive_ack()?;
-        while self.0.wait_ready()?.is_pending() {
-            if timeout.wait().is_ok() {
-                return Err(Error::Timeout);
-            }
-        }
+        core::future::poll_fn(|_| self.interface.wait_ready()).await?;
         self.receive_response(frame[6], response_buf)
     }
 
     pub fn send(&mut self, frame: &[u8]) -> Result<(), Error<I::Error>> {
-        self.0.write(frame)?;
+        self.interface.write(frame)?;
         Ok(())
     }
 
     pub fn receive_ack(&mut self) -> Result<(), Error<I::Error>> {
         let mut ack_buf = [0; 6];
-        self.0.read(&mut ack_buf)?;
+        self.interface.read(&mut ack_buf)?;
         if ack_buf != ACK {
             Err(Error::NACK)
         } else {
@@ -86,13 +91,13 @@ impl<I: Interface> Pn532<I> {
         seventh_frame_byte: u8,
         response_buf: &'a mut [u8],
     ) -> Result<&'a [u8], Error<I::Error>> {
-        self.0.read(response_buf)?;
+        self.interface.read(response_buf)?;
         let expected_response_command = seventh_frame_byte + 1;
         parse_response(response_buf, expected_response_command)
     }
 }
 
-impl Pn532<()> {
+impl Pn532<(), ()> {
     /// N = data.len() + 8
     pub const fn make_frame<const N: usize>(data: &[u8]) -> [u8; N] {
         if data.len() + 8 != N {

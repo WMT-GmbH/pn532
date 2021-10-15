@@ -12,6 +12,8 @@ pub const PN532_SPI_DATAWRITE: u8 = 0x01;
 pub const PN532_SPI_DATAREAD: u8 = 0x03;
 pub const PN532_SPI_READY: u8 = 0x01;
 
+// TODO msb bit inverting
+
 pub struct SPIInterface<SPI, CS> {
     pub spi: SPI,
     pub cs: CS,
