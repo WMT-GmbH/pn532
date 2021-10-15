@@ -7,12 +7,19 @@ use embedded_hal::digital::v2::{InputPin, OutputPin};
 
 use crate::Interface;
 
-pub const PN532_SPI_STATREAD: u8 = 0x02;
-pub const PN532_SPI_DATAWRITE: u8 = 0x01;
-pub const PN532_SPI_DATAREAD: u8 = 0x03;
-pub const PN532_SPI_READY: u8 = 0x01;
+#[cfg(feature = "msb-spi")]
+const fn as_lsb(byte: u8) -> u8 {
+    byte.reverse_bits()
+}
+#[cfg(not(feature = "msb-spi"))]
+const fn as_lsb(byte: u8) -> u8 {
+    byte
+}
 
-// TODO msb bit inverting
+pub const PN532_SPI_STATREAD: u8 = as_lsb(0x02);
+pub const PN532_SPI_DATAWRITE: u8 = as_lsb(0x01);
+pub const PN532_SPI_DATAREAD: u8 = as_lsb(0x03);
+pub const PN532_SPI_READY: u8 = as_lsb(0x01);
 
 pub struct SPIInterface<SPI, CS> {
     pub spi: SPI,
@@ -31,7 +38,14 @@ where
     fn write(&mut self, frame: &[u8]) -> Result<(), Self::Error> {
         self.cs.set_low().ok();
         self.spi.write(&[PN532_SPI_DATAWRITE])?;
+
+        #[cfg(feature = "msb-spi")]
+        for byte in frame {
+            self.spi.write(&[byte.reverse_bits()])?
+        }
+        #[cfg(not(feature = "msb-spi"))]
         self.spi.write(frame)?;
+
         self.cs.set_high().ok();
         Ok(())
     }
@@ -52,6 +66,11 @@ where
         self.spi.write(&[PN532_SPI_DATAWRITE])?;
         self.spi.transfer(buf)?;
         self.cs.set_high().ok();
+
+        #[cfg(feature = "msb-spi")]
+        for byte in buf.iter_mut() {
+            *byte = byte.reverse_bits();
+        }
         Ok(())
     }
 }
@@ -94,6 +113,11 @@ where
         self.spi.write(&[PN532_SPI_DATAWRITE])?;
         self.spi.transfer(buf)?;
         self.cs.set_high().ok();
+
+        #[cfg(feature = "msb-spi")]
+        for byte in buf.iter_mut() {
+            *byte = byte.reverse_bits();
+        }
         Ok(())
     }
 }
