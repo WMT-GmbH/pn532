@@ -85,7 +85,7 @@ impl<I: Interface, T> Pn532<I, T> {
         }
     }
 
-    /// frame[6]
+    /// frame[6] FIXME doc
     pub fn receive_response<'a>(
         &mut self,
         seventh_frame_byte: u8,
@@ -145,7 +145,7 @@ fn parse_response<E: Debug>(
     if frame_len < 2 || (frame_len.wrapping_add(response_buf[4])) != 0 {
         return Err(Error::BadResponseFrame);
     }
-    match response_buf.get(5 + frame_len as usize) {
+    match response_buf.get(5 + frame_len as usize + 1) {
         None => {
             return Err(Error::BufTooSmall);
         }

@@ -63,7 +63,7 @@ where
 
     fn read(&mut self, buf: &mut [u8]) -> Result<(), Self::Error> {
         self.cs.set_low().ok();
-        self.spi.write(&[PN532_SPI_DATAWRITE])?;
+        self.spi.write(&[PN532_SPI_DATAREAD])?;
         self.spi.transfer(buf)?;
         self.cs.set_high().ok();
 
@@ -94,7 +94,14 @@ where
     fn write(&mut self, frame: &[u8]) -> Result<(), Self::Error> {
         self.cs.set_low().ok();
         self.spi.write(&[PN532_SPI_DATAWRITE])?;
+
+        #[cfg(feature = "msb-spi")]
+        for byte in frame {
+            self.spi.write(&[byte.reverse_bits()])?
+        }
+        #[cfg(not(feature = "msb-spi"))]
         self.spi.write(frame)?;
+
         self.cs.set_high().ok();
         Ok(())
     }
@@ -110,7 +117,7 @@ where
 
     fn read(&mut self, buf: &mut [u8]) -> Result<(), Self::Error> {
         self.cs.set_low().ok();
-        self.spi.write(&[PN532_SPI_DATAWRITE])?;
+        self.spi.write(&[PN532_SPI_DATAREAD])?;
         self.spi.transfer(buf)?;
         self.cs.set_high().ok();
 
