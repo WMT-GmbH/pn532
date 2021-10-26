@@ -17,7 +17,8 @@ pub enum Error<E: Debug> {
     BadResponseFrame,
     CrcError,
     BufTooSmall,
-    Timeout,
+    TimeoutAck,
+    TimeoutResponse,
     InterfaceError(E),
 }
 
@@ -43,13 +44,13 @@ impl<I: Interface, T: CountDown> Pn532<I, T> {
         self.interface.write(frame)?;
         while self.interface.wait_ready()?.is_pending() {
             if self.timer.wait().is_ok() {
-                return Err(Error::Timeout);
+                return Err(Error::TimeoutAck);
             }
         }
         self.receive_ack()?;
         while self.interface.wait_ready()?.is_pending() {
             if self.timer.wait().is_ok() {
-                return Err(Error::Timeout);
+                return Err(Error::TimeoutResponse);
             }
         }
         self.receive_response(frame[6], response_buf)

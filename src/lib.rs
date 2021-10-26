@@ -1,4 +1,3 @@
-#![feature(const_panic)]
 #![feature(future_poll_fn)]
 #![no_std]
 
