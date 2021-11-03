@@ -55,6 +55,20 @@ impl<I: Interface, T: CountDown> Pn532<I, T> {
         }
         self.receive_response(frame[6], response_buf)
     }
+    pub fn process_no_response<'a>(
+        &mut self,
+        frame: &[u8],
+        timeout: T::Time,
+    ) -> Result<(), Error<I::Error>> {
+        self.timer.start(timeout);
+        self.interface.write(frame)?;
+        while self.interface.wait_ready()?.is_pending() {
+            if self.timer.wait().is_ok() {
+                return Err(Error::TimeoutAck);
+            }
+        }
+        self.receive_ack()
+    }
 }
 impl<I: Interface, T> Pn532<I, T> {
     // False positive: https://github.com/rust-lang/rust-clippy/issues/5787
@@ -95,6 +109,15 @@ impl<I: Interface, T> Pn532<I, T> {
         self.interface.read(response_buf)?;
         let expected_response_command = seventh_frame_byte + 1;
         parse_response(response_buf, expected_response_command)
+    }
+
+    /// Send an ACK frame to force the PN532 to abort the current process.
+    /// In that case, the PN532 discontinues the last processing and does not answer anything
+    /// to the host controller.
+    /// Then, the PN532 starts again waiting for a new command.
+    pub fn abort(&mut self) -> Result<(), Error<I::Error>> {
+        self.interface.write(&ACK)?;
+        Ok(())
     }
 }
 

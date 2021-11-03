@@ -100,6 +100,20 @@ pub enum CardType {
     Jewel = 0x04,
 }
 
+#[repr(u8)]
+pub enum TxSpeed {
+    Tx106kbps = 0b0000_0000,
+    Tx212kbps = 0b0001_0000,
+    Tx424kbps = 0b0010_0000,
+    Tx848kbps = 0b0011_0000,
+}
+
+#[repr(u8)]
+pub enum TxFraming {
+    Mifare = 0b0000_0000,
+    FeliCa = 0b0000_0010,
+}
+
 impl Pn532<(), ()> {
     pub const GET_FIRMWARE_VERSION: [u8; 1 + 8] =
         Pn532::make_frame(&[Command::GetFirmwareVersion as u8]);
@@ -121,6 +135,13 @@ impl Pn532<(), ()> {
             mode,
             timeout,
             !use_irq_pin as u8,
+        ])
+    }
+
+    pub const fn rf_regulation_test_frame(tx_speed: TxSpeed, tx_framing: TxFraming) -> [u8; 2 + 8] {
+        Pn532::make_frame(&[
+            Command::RFRegulationTest as u8,
+            tx_speed as u8 | tx_framing as u8,
         ])
     }
 
