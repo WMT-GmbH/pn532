@@ -2,7 +2,8 @@ use core::fmt::Debug;
 
 use embedded_hal::timer::CountDown;
 
-use crate::Interface;
+use crate::requests::Command;
+use crate::{Interface, Request};
 
 const PREAMBLE: [u8; 3] = [0x00, 0x00, 0xFF];
 const POSTAMBLE: u8 = 0x00;
@@ -28,20 +29,22 @@ impl<E: Debug> From<E> for Error<E> {
     }
 }
 
-pub struct Pn532<I, T> {
+/// `N` >= max(response_len, request.data.len()) + 9
+pub struct Pn532<I, T, const N: usize = 32> {
     pub interface: I,
     pub timer: T,
+    buf: [u8; N],
 }
 
-impl<I: Interface, T: CountDown> Pn532<I, T> {
-    pub fn process<'a>(
+impl<I: Interface, T: CountDown, const N: usize> Pn532<I, T, N> {
+    pub fn process(
         &mut self,
-        frame: &[u8],
-        response_buf: &'a mut [u8],
+        request: Request<'_>,
+        response_len: usize,
         timeout: T::Time,
-    ) -> Result<&'a [u8], Error<I::Error>> {
+    ) -> Result<&[u8], Error<I::Error>> {
         self.timer.start(timeout);
-        self.interface.write(frame)?;
+        self.send(request)?;
         while self.interface.wait_ready()?.is_pending() {
             if self.timer.wait().is_ok() {
                 return Err(Error::TimeoutAck);
@@ -53,15 +56,15 @@ impl<I: Interface, T: CountDown> Pn532<I, T> {
                 return Err(Error::TimeoutResponse);
             }
         }
-        self.receive_response(frame[6], response_buf)
+        self.receive_response(request.command, response_len)
     }
-    pub fn process_no_response<'a>(
+    pub fn process_no_response(
         &mut self,
-        frame: &[u8],
+        request: Request<'_>,
         timeout: T::Time,
     ) -> Result<(), Error<I::Error>> {
         self.timer.start(timeout);
-        self.interface.write(frame)?;
+        self.send(request)?;
         while self.interface.wait_ready()?.is_pending() {
             if self.timer.wait().is_ok() {
                 return Err(Error::TimeoutAck);
@@ -70,23 +73,56 @@ impl<I: Interface, T: CountDown> Pn532<I, T> {
         self.receive_ack()
     }
 }
-impl<I: Interface, T> Pn532<I, T> {
+impl<I: Interface, T, const N: usize> Pn532<I, T, N> {
+    pub fn new(interface: I, timer: T) -> Self {
+        Pn532 {
+            interface,
+            timer,
+            buf: [0; N],
+        }
+    }
+
     // False positive: https://github.com/rust-lang/rust-clippy/issues/5787
     #[allow(clippy::needless_lifetimes)]
-    pub async fn process_async<'a>(
+    pub async fn process_async(
         &mut self,
-        frame: &[u8],
-        response_buf: &'a mut [u8],
-    ) -> Result<&'a [u8], Error<I::Error>> {
-        self.interface.write(frame)?;
+        request: Request<'_>,
+        response_len: usize,
+    ) -> Result<&[u8], Error<I::Error>> {
+        self.send(request)?;
         core::future::poll_fn(|_| self.interface.wait_ready()).await?;
         self.receive_ack()?;
         core::future::poll_fn(|_| self.interface.wait_ready()).await?;
-        self.receive_response(frame[6], response_buf)
+        self.receive_response(request.command, response_len)
     }
 
-    pub fn send(&mut self, frame: &[u8]) -> Result<(), Error<I::Error>> {
-        self.interface.write(frame)?;
+    pub fn send(&mut self, request: Request<'_>) -> Result<(), Error<I::Error>> {
+        let data_len = request.data.len();
+        let frame_len = 2 + data_len as u8; // frame identifier + command + data
+
+        let mut data_sum = HOSTTOPN532.wrapping_add(request.command as u8); // sum(command + data + frame identifier)
+        for &byte in request.data {
+            data_sum = data_sum.wrapping_add(byte);
+        }
+
+        const fn to_checksum(sum: u8) -> u8 {
+            (!sum).wrapping_add(1)
+        }
+
+        self.buf[0] = PREAMBLE[0];
+        self.buf[1] = PREAMBLE[1];
+        self.buf[2] = PREAMBLE[2];
+        self.buf[3] = frame_len;
+        self.buf[4] = to_checksum(frame_len);
+        self.buf[5] = HOSTTOPN532;
+        self.buf[6] = request.command as u8;
+
+        self.buf[7..7 + data_len].copy_from_slice(request.data);
+
+        self.buf[7 + data_len] = to_checksum(data_sum);
+        self.buf[8 + data_len] = POSTAMBLE;
+
+        self.interface.write(&self.buf[..9 + data_len])?;
         Ok(())
     }
 
@@ -100,14 +136,15 @@ impl<I: Interface, T> Pn532<I, T> {
         }
     }
 
-    /// frame[6] FIXME doc
-    pub fn receive_response<'a>(
+    pub fn receive_response(
         &mut self,
-        seventh_frame_byte: u8,
-        response_buf: &'a mut [u8],
-    ) -> Result<&'a [u8], Error<I::Error>> {
+        sent_command: Command,
+        response_len: usize,
+    ) -> Result<&[u8], Error<I::Error>> {
+        let response_buf = &mut self.buf[..response_len + 9];
+        response_buf.fill(0); // zero out buf
         self.interface.read(response_buf)?;
-        let expected_response_command = seventh_frame_byte + 1;
+        let expected_response_command = sent_command as u8 + 1;
         parse_response(response_buf, expected_response_command)
     }
 
@@ -121,46 +158,10 @@ impl<I: Interface, T> Pn532<I, T> {
     }
 }
 
-impl Pn532<(), ()> {
-    /// N = data.len() + 8
-    pub const fn make_frame<const N: usize>(data: &[u8]) -> [u8; N] {
-        if data.len() + 8 != N {
-            panic!("N should be data.len() + 8");
-        }
-
-        let mut frame = [0; N];
-
-        let frame_len = data.len() as u8 + 1; // data + frame identifier
-
-        let mut data_sum = HOSTTOPN532; // sum(data + frame identifier)
-        let mut i = 0;
-        while i < data.len() {
-            data_sum = data_sum.wrapping_add(data[i]);
-            frame[6 + i] = data[i];
-            i += 1;
-        }
-
-        const fn to_checksum(sum: u8) -> u8 {
-            (!sum).wrapping_add(1)
-        }
-
-        frame[0] = PREAMBLE[0];
-        frame[1] = PREAMBLE[1];
-        frame[2] = PREAMBLE[2];
-        frame[3] = frame_len;
-        frame[4] = to_checksum(frame_len);
-        frame[5] = HOSTTOPN532;
-        frame[6 + data.len()] = to_checksum(data_sum);
-        frame[7 + data.len()] = POSTAMBLE;
-        frame
-    }
-}
-
 fn parse_response<E: Debug>(
     response_buf: &[u8],
     expected_response_command: u8,
 ) -> Result<&[u8], Error<E>> {
-    // TODO look for preamble and shift
     if response_buf[0..3] != PREAMBLE {
         return Err(Error::BadResponseFrame);
     }
