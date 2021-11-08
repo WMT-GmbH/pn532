@@ -2,7 +2,7 @@ use core::fmt::Debug;
 
 use embedded_hal::timer::CountDown;
 
-use crate::requests::Command;
+use crate::requests::{BorrowedRequest, Command};
 use crate::{Interface, Request};
 
 const PREAMBLE: [u8; 3] = [0x00, 0x00, 0xFF];
@@ -37,14 +37,25 @@ pub struct Pn532<I, T, const N: usize = 32> {
 }
 
 impl<I: Interface, T: CountDown, const N: usize> Pn532<I, T, N> {
-    pub fn process(
+    #[inline]
+    pub fn process<const M: usize>(
         &mut self,
-        request: Request<'_>,
+        request: &Request<M>,
         response_len: usize,
         timeout: T::Time,
     ) -> Result<&[u8], Error<I::Error>> {
+        // codegen trampoline: https://github.com/rust-lang/rust/issues/77960
+        self._process(request.borrow(), response_len, timeout)
+    }
+    fn _process(
+        &mut self,
+        request: BorrowedRequest<'_>,
+        response_len: usize,
+        timeout: T::Time,
+    ) -> Result<&[u8], Error<I::Error>> {
+        let sent_command = request.command;
         self.timer.start(timeout);
-        self.send(request)?;
+        self._send(request)?;
         while self.interface.wait_ready()?.is_pending() {
             if self.timer.wait().is_ok() {
                 return Err(Error::TimeoutAck);
@@ -56,15 +67,25 @@ impl<I: Interface, T: CountDown, const N: usize> Pn532<I, T, N> {
                 return Err(Error::TimeoutResponse);
             }
         }
-        self.receive_response(request.command, response_len)
+        self.receive_response(sent_command, response_len)
     }
-    pub fn process_no_response(
+
+    #[inline]
+    pub fn process_no_response<const M: usize>(
         &mut self,
-        request: Request<'_>,
+        request: &Request<M>,
+        timeout: T::Time,
+    ) -> Result<(), Error<I::Error>> {
+        // codegen trampoline: https://github.com/rust-lang/rust/issues/77960
+        self._process_no_response(request.borrow(), timeout)
+    }
+    fn _process_no_response(
+        &mut self,
+        request: BorrowedRequest<'_>,
         timeout: T::Time,
     ) -> Result<(), Error<I::Error>> {
         self.timer.start(timeout);
-        self.send(request)?;
+        self._send(request)?;
         while self.interface.wait_ready()?.is_pending() {
             if self.timer.wait().is_ok() {
                 return Err(Error::TimeoutAck);
@@ -82,21 +103,34 @@ impl<I: Interface, T, const N: usize> Pn532<I, T, N> {
         }
     }
 
-    // False positive: https://github.com/rust-lang/rust-clippy/issues/5787
-    #[allow(clippy::needless_lifetimes)]
-    pub async fn process_async(
+    #[inline]
+    pub async fn process_async<const M: usize>(
         &mut self,
-        request: Request<'_>,
+        request: &Request<M>,
         response_len: usize,
     ) -> Result<&[u8], Error<I::Error>> {
-        self.send(request)?;
+        // codegen trampoline: https://github.com/rust-lang/rust/issues/77960
+        self._process_async(request.borrow(), response_len).await
+    }
+    async fn _process_async(
+        &mut self,
+        request: BorrowedRequest<'_>,
+        response_len: usize,
+    ) -> Result<&[u8], Error<I::Error>> {
+        let sent_command = request.command;
+        self._send(request)?;
         core::future::poll_fn(|_| self.interface.wait_ready()).await?;
         self.receive_ack()?;
         core::future::poll_fn(|_| self.interface.wait_ready()).await?;
-        self.receive_response(request.command, response_len)
+        self.receive_response(sent_command, response_len)
     }
 
-    pub fn send(&mut self, request: Request<'_>) -> Result<(), Error<I::Error>> {
+    #[inline]
+    pub fn send<const M: usize>(&mut self, request: &Request<M>) -> Result<(), Error<I::Error>> {
+        // codegen trampoline: https://github.com/rust-lang/rust/issues/77960
+        self._send(request.borrow())
+    }
+    fn _send(&mut self, request: BorrowedRequest<'_>) -> Result<(), Error<I::Error>> {
         let data_len = request.data.len();
         let frame_len = 2 + data_len as u8; // frame identifier + command + data
 

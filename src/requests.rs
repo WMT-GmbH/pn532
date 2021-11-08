@@ -1,92 +1,96 @@
-#[derive(Copy, Clone)]
-pub struct Request<'a> {
-    pub command: Command,
-    pub data: &'a [u8],
-}
-
-#[derive(Copy, Clone)]
-pub struct OwnedRequest<const N: usize> {
+#[derive(Clone)]
+pub struct Request<const N: usize> {
     pub command: Command,
     pub data: [u8; N],
 }
 
-impl<const N: usize> OwnedRequest<N> {
-    pub fn borrow(&self) -> Request<'_> {
-        Request {
+pub(crate) struct BorrowedRequest<'a> {
+    pub command: Command,
+    pub data: &'a [u8],
+}
+
+impl<const N: usize> Request<N> {
+    pub(crate) fn borrow(&self) -> BorrowedRequest<'_> {
+        BorrowedRequest {
             command: self.command,
             data: &self.data,
         }
     }
 }
 
-impl<'a> Request<'a> {
+impl<const N: usize> Request<N> {
     #[inline]
-    pub const fn new(command: Command) -> Self {
-        Request { command, data: &[] }
+    pub const fn new(command: Command, data: [u8; N]) -> Self {
+        Request { command, data }
     }
-    #[inline]
-    pub const fn with_data(mut self, data: &'a [u8]) -> Self {
-        self.data = data;
-        self
-    }
+}
 
-    #[inline]
-    pub const fn with_data_array<const N: usize>(self, data: [u8; N]) -> OwnedRequest<N> {
-        OwnedRequest {
-            command: self.command,
-            data,
-        }
-    }
+impl Request<0> {
+    pub const GET_FIRMWARE_VERSION: Request<0> = Request::new(Command::GetFirmwareVersion, []);
+    pub const INLIST_ONE_ISO_A_TARGET: Request<2> =
+        Request::new(Command::InListPassiveTarget, [1, CardType::IsoTypeA as u8]);
 
-    pub const GET_FIRMWARE_VERSION: Request<'static> = Request::new(Command::GetFirmwareVersion);
-    pub const INLIST_ONE_ISO_A_TARGET: Request<'static> =
-        Request::new(Command::InListPassiveTarget).with_data(&[1, CardType::IsoTypeA as u8]);
+    pub const SELECT_TAG_1: Request<1> = Request::new(Command::InSelect, [1]);
+    pub const SELECT_TAG_2: Request<1> = Request::new(Command::InSelect, [2]);
+    pub const DESELECT_TAG_1: Request<1> = Request::new(Command::InDeselect, [1]);
+    pub const DESELECT_TAG_2: Request<1> = Request::new(Command::InDeselect, [2]);
+    pub const RELEASE_TAG_1: Request<1> = Request::new(Command::InRelease, [1]);
+    pub const RELEASE_TAG_2: Request<1> = Request::new(Command::InRelease, [2]);
 
-    pub const SELECT_TAG_1: Request<'static> = Request::new(Command::InSelect).with_data(&[1]);
-    pub const SELECT_TAG_2: Request<'static> = Request::new(Command::InSelect).with_data(&[2]);
-    pub const DESELECT_TAG_1: Request<'static> = Request::new(Command::InDeselect).with_data(&[1]);
-    pub const DESELECT_TAG_2: Request<'static> = Request::new(Command::InDeselect).with_data(&[2]);
-    pub const RELEASE_TAG_1: Request<'static> = Request::new(Command::InRelease).with_data(&[1]);
-    pub const RELEASE_TAG_2: Request<'static> = Request::new(Command::InRelease).with_data(&[2]);
-
-    pub const fn sam_configuration(mode: SAMMode, use_irq_pin: bool) -> OwnedRequest<3> {
+    pub const fn sam_configuration(mode: SAMMode, use_irq_pin: bool) -> Request<3> {
+        // TODO use_irq_pin seems to not have any effect
         let (mode, timeout) = match mode {
             SAMMode::Normal => (1, 0),
             SAMMode::VirtualCard { timeout } => (2, timeout),
             SAMMode::WiredCard => (3, 0),
             SAMMode::DualCard => (4, 0),
         };
-        Request::new(Command::SAMConfiguration).with_data_array([mode, timeout, !use_irq_pin as u8])
+        Request::new(
+            Command::SAMConfiguration,
+            [mode, timeout, use_irq_pin as u8],
+        )
     }
 
-    pub const fn rf_regulation_test(tx_speed: TxSpeed, tx_framing: TxFraming) -> OwnedRequest<1> {
-        Request::new(Command::RFRegulationTest).with_data_array([tx_speed as u8 | tx_framing as u8])
+    pub const fn rf_regulation_test(tx_speed: TxSpeed, tx_framing: TxFraming) -> Request<1> {
+        Request::new(
+            Command::RFRegulationTest,
+            [tx_speed as u8 | tx_framing as u8],
+        )
     }
 
     // TODO power down
 
-    pub const fn ntag_read(page: u8) -> OwnedRequest<3> {
-        Request::new(Command::InDataExchange).with_data_array([0x01, NTAGCommand::Read as u8, page])
+    pub const fn ntag_read(page: u8) -> Request<3> {
+        Request::new(
+            Command::InDataExchange,
+            [0x01, NTAGCommand::Read as u8, page],
+        )
     }
-    pub const fn ntag_write(page: u8, bytes: &[u8; 4]) -> OwnedRequest<7> {
-        Request::new(Command::InDataExchange).with_data_array([
-            0x01,
-            NTAGCommand::Write as u8,
-            page,
-            bytes[0],
-            bytes[1],
-            bytes[2],
-            bytes[3],
-        ])
+    pub const fn ntag_write(page: u8, bytes: &[u8; 4]) -> Request<7> {
+        Request::new(
+            Command::InDataExchange,
+            [
+                0x01,
+                NTAGCommand::Write as u8,
+                page,
+                bytes[0],
+                bytes[1],
+                bytes[2],
+                bytes[3],
+            ],
+        )
     }
-    pub const fn ntag_pwd_auth(bytes: &[u8; 4]) -> OwnedRequest<5> {
-        Request::new(Command::InCommunicateThru).with_data_array([
-            NTAGCommand::PwdAuth as u8,
-            bytes[0],
-            bytes[1],
-            bytes[2],
-            bytes[3],
-        ])
+    pub const fn ntag_pwd_auth(bytes: &[u8; 4]) -> Request<5> {
+        Request::new(
+            Command::InCommunicateThru,
+            [
+                NTAGCommand::PwdAuth as u8,
+                bytes[0],
+                bytes[1],
+                bytes[2],
+                bytes[3],
+            ],
+        )
     }
 }
 
