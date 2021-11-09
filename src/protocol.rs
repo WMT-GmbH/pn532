@@ -104,28 +104,6 @@ impl<I: Interface, T, const N: usize> Pn532<I, T, N> {
     }
 
     #[inline]
-    pub async fn process_async<const M: usize>(
-        &mut self,
-        request: &Request<M>,
-        response_len: usize,
-    ) -> Result<&[u8], Error<I::Error>> {
-        // codegen trampoline: https://github.com/rust-lang/rust/issues/77960
-        self._process_async(request.borrow(), response_len).await
-    }
-    async fn _process_async(
-        &mut self,
-        request: BorrowedRequest<'_>,
-        response_len: usize,
-    ) -> Result<&[u8], Error<I::Error>> {
-        let sent_command = request.command;
-        self._send(request)?;
-        core::future::poll_fn(|_| self.interface.wait_ready()).await?;
-        self.receive_ack()?;
-        core::future::poll_fn(|_| self.interface.wait_ready()).await?;
-        self.receive_response(sent_command, response_len)
-    }
-
-    #[inline]
     pub fn send<const M: usize>(&mut self, request: &Request<M>) -> Result<(), Error<I::Error>> {
         // codegen trampoline: https://github.com/rust-lang/rust/issues/77960
         self._send(request.borrow())
@@ -188,6 +166,56 @@ impl<I: Interface, T, const N: usize> Pn532<I, T, N> {
     /// Then, the PN532 starts again waiting for a new command.
     pub fn abort(&mut self) -> Result<(), Error<I::Error>> {
         self.interface.write(&ACK)?;
+        Ok(())
+    }
+}
+
+impl<I: Interface, const N: usize> Pn532<I, (), N> {
+    pub fn new_async(interface: I) -> Self {
+        Pn532 {
+            interface,
+            timer: (),
+            buf: [0; N],
+        }
+    }
+
+    #[inline]
+    pub async fn process_async<const M: usize>(
+        &mut self,
+        request: &Request<M>,
+        response_len: usize,
+    ) -> Result<&[u8], Error<I::Error>> {
+        // codegen trampoline: https://github.com/rust-lang/rust/issues/77960
+        self._process_async(request.borrow(), response_len).await
+    }
+    async fn _process_async(
+        &mut self,
+        request: BorrowedRequest<'_>,
+        response_len: usize,
+    ) -> Result<&[u8], Error<I::Error>> {
+        let sent_command = request.command;
+        self._send(request)?;
+        core::future::poll_fn(|_| self.interface.wait_ready()).await?;
+        self.receive_ack()?;
+        core::future::poll_fn(|_| self.interface.wait_ready()).await?;
+        self.receive_response(sent_command, response_len)
+    }
+
+    #[inline]
+    pub async fn process_no_response_async<const M: usize>(
+        &mut self,
+        request: &Request<M>,
+    ) -> Result<(), Error<I::Error>> {
+        // codegen trampoline: https://github.com/rust-lang/rust/issues/77960
+        self._process_no_response_async(request.borrow()).await
+    }
+    async fn _process_no_response_async(
+        &mut self,
+        request: BorrowedRequest<'_>,
+    ) -> Result<(), Error<I::Error>> {
+        self._send(request)?;
+        core::future::poll_fn(|_| self.interface.wait_ready()).await?;
+        self.receive_ack()?;
         Ok(())
     }
 }
