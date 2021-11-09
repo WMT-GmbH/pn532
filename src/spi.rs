@@ -1,3 +1,11 @@
+//! SPI interfaces
+//!
+//! # Note:
+//! The SPI peripheral must be in [`MODE_0`](embedded_hal::spi::MODE_0)
+//!
+//! The SPI peripheral should be in **lsb mode**.
+//! If your peripheral cannot be set to **lsb mode** you need to enable the `msb-spi` feature of this crate.
+
 use core::convert::Infallible;
 use core::fmt::Debug;
 use core::task::Poll;
@@ -16,11 +24,17 @@ const fn as_lsb(byte: u8) -> u8 {
     byte
 }
 
+/// To be used in `Interface::wait_ready` implementations
 pub const PN532_SPI_STATREAD: u8 = as_lsb(0x02);
+/// To be used in `Interface::write` implementations
 pub const PN532_SPI_DATAWRITE: u8 = as_lsb(0x01);
+/// To be used in `Interface::read` implementations
 pub const PN532_SPI_DATAREAD: u8 = as_lsb(0x03);
+/// To be used in `Interface::wait_ready` implementations
 pub const PN532_SPI_READY: u8 = as_lsb(0x01);
 
+/// SPI Interface without IRQ pin
+#[derive(Clone, Debug)]
 pub struct SPIInterface<SPI, CS> {
     pub spi: SPI,
     pub cs: CS,
@@ -75,6 +89,8 @@ where
     }
 }
 
+/// SPI Interface with IRQ pin
+#[derive(Clone, Debug)]
 pub struct SPIInterfaceWithIrq<SPI, CS, IRQ> {
     pub spi: SPI,
     pub cs: CS,

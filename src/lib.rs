@@ -1,6 +1,10 @@
-#![feature(future_poll_fn)]
-#![feature(const_generics_defaults)]
+//! Pn532
+
 #![no_std]
+// features should be stabilized soon
+#![feature(future_poll_fn)] // https://github.com/rust-lang/rust/issues/72302
+#![feature(const_generics_defaults)] // https://github.com/rust-lang/rust/pull/90207
+#![warn(missing_docs)]
 
 use core::fmt::Debug;
 use core::task::Poll;
@@ -13,10 +17,18 @@ mod protocol;
 pub mod requests;
 pub mod spi;
 
+/// Abstraction over the different serial links.
+/// Either SPI, I2C or HSU (High Speed UART).
 pub trait Interface {
+    /// Error specific to the serial link.
     type Error: Debug;
+    /// Writes a `frame` to the Pn532
     fn write(&mut self, frame: &[u8]) -> Result<(), Self::Error>;
+    /// Checks if the Pn532 has data to be read.
+    /// Uses either the serial link or the IRQ pin.
     fn wait_ready(&mut self) -> Poll<Result<(), Self::Error>>;
+    /// Reads data from the Pn532 into `buf`.
+    /// This method will only be called if `wait_ready` returned `Poll::Ready(Ok(()))` before.
     fn read(&mut self, buf: &mut [u8]) -> Result<(), Self::Error>;
 }
 
@@ -36,69 +48,136 @@ impl<I: Interface> Interface for &mut I {
     }
 }
 
+/// Some commands return a status byte.
+/// If this byte is not zero it will contain an `ErrorCode`.
+///
+/// ```
+/// # use pn532::ErrorCode;
+/// fn print_error(status_byte: u8){
+///     if let Ok(error_code) = ErrorCode::try_from(status_byte){
+///         println!("{:?}", error_code);
+///     } else {
+///         println!("unknown error code");
+///     }
+/// }
+/// ```
 #[repr(u8)]
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
-pub enum ErrorStatus {
+pub enum ErrorCode {
+    /// Time Out, the target has not answered
     Timeout = 0x01,
+    /// A CRC error has been detected by the CIU
     CrcError = 0x02,
+    /// A Parity error has been detected by the CIU
     ParityError = 0x03,
+    /// During an anti-collision/select operation (ISO/IEC14443-3
+    /// Type A and ISO/IEC18092 106 kbps passive mode), an
+    /// erroneous Bit Count has been detected
     WrongBitCountDuringAntiCollision = 0x04,
+    /// Framing error during Mifare operation
     FramingError = 0x05,
+    /// An abnormal bit-collision has been detected during bit wise
+    /// anti-collision at 106 kbps
     AbnormalBitCollision = 0x06,
+    /// Communication buffer size insufficient
     InsufficientCommunicationBuffer = 0x07,
+    /// RF Buffer overflow has been detected by the CIU (bit
+    /// BufferOvfl of the register CIU_Error)
     RfBufferOverflow = 0x09,
+    /// In active communication mode, the RF field has not been
+    /// switched on in time by the counterpart (as defined in NFCIP-1
+    /// standard)
     RfFieldHasNotBeenSwitchedOn = 0x0A,
+    /// RF Protocol error (cf. Error! Reference source not found.,
+    /// description of the CIU_Error register)
     RfProtocolError = 0x0B,
+    /// Temperature error: the internal temperature sensor has
+    /// detected overheating, and therefore has automatically
+    /// switched off the antenna drivers
     Overheating = 0x0D,
+    /// Internal buffer overflow
     InternalBufferOverflow = 0x0E,
+    /// Invalid parameter (range, format, …)
     InvalidParameter = 0x10,
+    /// DEP Protocol: The PN532 configured in target mode does not
+    /// support the command received from the initiator (the
+    /// command received is not one of the following: ATR_REQ,
+    /// WUP_REQ, PSL_REQ, DEP_REQ, DSL_REQ, RLS_REQ
+    /// Error! Reference source not found.).
     CommandNotSupported = 0x12,
+    /// DEP Protocol, Mifare or ISO/IEC14443-4: The data format
+    /// does not match to the specification.
+    /// Depending on the RF protocol used, it can be:
+    /// • Bad length of RF received frame,
+    /// • Incorrect value of PCB or PFB,
+    /// • Invalid or unexpected RF received frame,
+    /// • NAD or DID incoherence.
     WrongDataFormat = 0x13,
+    /// Mifare: Authentication error
     AuthenticationError = 0x14,
+    /// ISO/IEC14443-3: UID Check byte is wrong
     WrongUidCheckByte = 0x23,
+    /// DEP Protocol: Invalid device state, the system is in a state
+    /// which does not allow the operation
     InvalidDeviceState = 0x25,
+    /// Operation not allowed in this configuration (host controller
+    /// interface)
     OperationNotAllowed = 0x26,
+    /// This command is not acceptable due to the current context of
+    /// the PN532 (Initiator vs. Target, unknown target number,
+    /// Target not in the good state, …)
     CommandNotAcceptable = 0x27,
+    /// The PN532 configured as target has been released by its
+    /// initiator
     TargetHasBeenReleased = 0x29,
+    /// PN532 and ISO/IEC14443-3B only: the ID of the card does
+    /// not match, meaning that the expected card has been
+    /// exchanged with another one.
     CardHasBeenExchanged = 0x2A,
+    /// PN532 and ISO/IEC14443-3B only: the card previously
+    /// activated has disappeared.
     CardHasDisappeared = 0x2B,
+    /// Mismatch between the NFCID3 initiator and the NFCID3
+    /// target in DEP 212/424 kbps passive.
     Nfcid3InitiatorTargetMismatch = 0x2C,
+    /// An over-current event has been detected
     OverCurrent = 0x2D,
+    /// NAD missing in DEP frame
     NadMsssing = 0x2E,
 }
 
-impl core::convert::TryFrom<u8> for ErrorStatus {
+impl core::convert::TryFrom<u8> for ErrorCode {
     type Error = ();
 
-    fn try_from(value: u8) -> Result<ErrorStatus, ()> {
+    fn try_from(value: u8) -> Result<ErrorCode, ()> {
         let value = value & 0b0011_1111;
         match value {
-            0x01 => Ok(ErrorStatus::Timeout),
-            0x02 => Ok(ErrorStatus::CrcError),
-            0x03 => Ok(ErrorStatus::ParityError),
-            0x04 => Ok(ErrorStatus::WrongBitCountDuringAntiCollision),
-            0x05 => Ok(ErrorStatus::FramingError),
-            0x06 => Ok(ErrorStatus::AbnormalBitCollision),
-            0x07 => Ok(ErrorStatus::InsufficientCommunicationBuffer),
-            0x09 => Ok(ErrorStatus::RfBufferOverflow),
-            0x0A => Ok(ErrorStatus::RfFieldHasNotBeenSwitchedOn),
-            0x0B => Ok(ErrorStatus::RfProtocolError),
-            0x0D => Ok(ErrorStatus::Overheating),
-            0x0E => Ok(ErrorStatus::InternalBufferOverflow),
-            0x10 => Ok(ErrorStatus::InvalidParameter),
-            0x12 => Ok(ErrorStatus::CommandNotSupported),
-            0x13 => Ok(ErrorStatus::WrongDataFormat),
-            0x14 => Ok(ErrorStatus::AuthenticationError),
-            0x23 => Ok(ErrorStatus::WrongUidCheckByte),
-            0x25 => Ok(ErrorStatus::InvalidDeviceState),
-            0x26 => Ok(ErrorStatus::OperationNotAllowed),
-            0x27 => Ok(ErrorStatus::CommandNotAcceptable),
-            0x29 => Ok(ErrorStatus::TargetHasBeenReleased),
-            0x2A => Ok(ErrorStatus::CardHasBeenExchanged),
-            0x2B => Ok(ErrorStatus::CardHasDisappeared),
-            0x2C => Ok(ErrorStatus::Nfcid3InitiatorTargetMismatch),
-            0x2D => Ok(ErrorStatus::OverCurrent),
-            0x2E => Ok(ErrorStatus::NadMsssing),
+            0x01 => Ok(ErrorCode::Timeout),
+            0x02 => Ok(ErrorCode::CrcError),
+            0x03 => Ok(ErrorCode::ParityError),
+            0x04 => Ok(ErrorCode::WrongBitCountDuringAntiCollision),
+            0x05 => Ok(ErrorCode::FramingError),
+            0x06 => Ok(ErrorCode::AbnormalBitCollision),
+            0x07 => Ok(ErrorCode::InsufficientCommunicationBuffer),
+            0x09 => Ok(ErrorCode::RfBufferOverflow),
+            0x0A => Ok(ErrorCode::RfFieldHasNotBeenSwitchedOn),
+            0x0B => Ok(ErrorCode::RfProtocolError),
+            0x0D => Ok(ErrorCode::Overheating),
+            0x0E => Ok(ErrorCode::InternalBufferOverflow),
+            0x10 => Ok(ErrorCode::InvalidParameter),
+            0x12 => Ok(ErrorCode::CommandNotSupported),
+            0x13 => Ok(ErrorCode::WrongDataFormat),
+            0x14 => Ok(ErrorCode::AuthenticationError),
+            0x23 => Ok(ErrorCode::WrongUidCheckByte),
+            0x25 => Ok(ErrorCode::InvalidDeviceState),
+            0x26 => Ok(ErrorCode::OperationNotAllowed),
+            0x27 => Ok(ErrorCode::CommandNotAcceptable),
+            0x29 => Ok(ErrorCode::TargetHasBeenReleased),
+            0x2A => Ok(ErrorCode::CardHasBeenExchanged),
+            0x2B => Ok(ErrorCode::CardHasDisappeared),
+            0x2C => Ok(ErrorCode::Nfcid3InitiatorTargetMismatch),
+            0x2D => Ok(ErrorCode::OverCurrent),
+            0x2E => Ok(ErrorCode::NadMsssing),
             _ => Err(()),
         }
     }

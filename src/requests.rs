@@ -1,4 +1,6 @@
-#[derive(Clone)]
+//! Pn532 Requests
+
+#[derive(Clone, Eq, PartialEq, Debug)]
 pub struct Request<const N: usize> {
     pub command: Command,
     pub data: [u8; N],
@@ -58,8 +60,6 @@ impl Request<0> {
         )
     }
 
-    // TODO power down
-
     pub const fn ntag_read(page: u8) -> Request<3> {
         Request::new(
             Command::InDataExchange,
@@ -94,43 +94,78 @@ impl Request<0> {
     }
 }
 
-#[derive(Copy, Clone)]
+/// Commands supported by the Pn532
+#[derive(Copy, Clone, Eq, PartialEq, Debug)]
 #[repr(u8)]
 pub enum Command {
+    /// See 7.2.1 Diagnose
     Diagnose = 0x00,
+    /// See 7.2.2 GetFirmwareVersion
     GetFirmwareVersion = 0x02,
+    /// See 7.2.3 GetGeneralStatus
     GetGeneralStatus = 0x04,
+    /// See 7.2.4 ReadRegister
     ReadRegister = 0x06,
+    /// See 7.2.5 WriteRegister
     WriteRegister = 0x08,
+    /// See 7.2.6 ReadGPIO
     ReadGPIO = 0x0C,
+    /// See 7.2.7 WriteGPIO
     WriteGPIO = 0x0E,
+    /// See 7.2.8 SetSerialBaudRate
     SetSerialBaudRate = 0x10,
+    /// See 7.2.9 SetParameters
     SetParameters = 0x12,
+    /// See 7.2.10 SAMConfiguration
     SAMConfiguration = 0x14,
+    /// See 7.2.11 PowerDown
     PowerDown = 0x16,
+    /// See 7.3.1 RFConfiguration
     RFConfiguration = 0x32,
+    /// See 7.3.2 RFRegulationTest
     RFRegulationTest = 0x58,
+    /// See 7.3.3 InJumpForDEP
     InJumpForDEP = 0x56,
+    /// See 7.3.4 InJumpForPSL
     InJumpForPSL = 0x46,
+    /// See 7.3.5 InListPassiveTarget
     InListPassiveTarget = 0x4A,
+    /// See 7.3.6 InATR
     InATR = 0x50,
+    /// See 7.3.7 InPSL
     InPSL = 0x4E,
+    /// See 7.3.8 InDataExchange
     InDataExchange = 0x40,
+    /// See 7.3.9 InCommunicateThru
     InCommunicateThru = 0x42,
+    /// See 7.3.10 InDeselect
     InDeselect = 0x44,
+    /// See 7.3.11 InRelease
     InRelease = 0x52,
+    /// See 7.3.12 InSelect
     InSelect = 0x54,
+    /// See 7.3.13 InAutoPoll
     InAutoPoll = 0x60,
+    /// See 7.3.14 TgInitAsTarget
     TgInitAsTarget = 0x8C,
+    /// See 7.3.15 TgSetGeneralBytes
     TgSetGeneralBytes = 0x92,
+    /// See 7.3.16 TgGetData
     TgGetData = 0x86,
+    /// See 7.3.17 TgSetData
     TgSetData = 0x8E,
+    /// See 7.3.18 TgSetMetaData
     TgSetMetaData = 0x94,
+    /// See 7.3.19 TgGetInitiatorCommand
     TgGetInitiatorCommand = 0x88,
+    /// See 7.3.20 TgResponseToInitiator
     TgResponseToInitiator = 0x90,
+    /// See 7.3.21 TgGetTargetStatus
     TgGetTargetStatus = 0x8A,
 }
 
+/// SAM mode parameter to be used in [`Command::SAMConfiguration`]
+#[derive(Copy, Clone, Eq, PartialEq, Debug)]
 pub enum SAMMode {
     /// The SAM is not used; this is the default mode
     Normal,
@@ -148,6 +183,8 @@ pub enum SAMMode {
     DualCard,
 }
 
+/// Card type parameter to be used in [`Command::InListPassiveTarget`]
+#[derive(Copy, Clone, Eq, PartialEq, Debug)]
 #[repr(u8)]
 pub enum CardType {
     /// 106 kbps type A (ISO/IEC14443 Type A)
@@ -162,20 +199,29 @@ pub enum CardType {
     Jewel = 0x04,
 }
 
+/// Bitrate to be used in [`Command::RFRegulationTest`]
+#[derive(Copy, Clone, Eq, PartialEq, Debug)]
 #[repr(u8)]
 pub enum TxSpeed {
+    /// 106 kbps
     Tx106kbps = 0b0000_0000,
+    /// 212 kbps
     Tx212kbps = 0b0001_0000,
+    /// 424 kbps
     Tx424kbps = 0b0010_0000,
+    /// 848 kbps
     Tx848kbps = 0b0011_0000,
 }
 
+/// Type of modulation to be used in [`Command::RFRegulationTest`]
+#[derive(Copy, Clone, Eq, PartialEq, Debug)]
 #[repr(u8)]
 pub enum TxFraming {
     Mifare = 0b0000_0000,
     FeliCa = 0b0000_0010,
 }
 
+#[derive(Copy, Clone, Eq, PartialEq, Debug)]
 #[repr(u8)]
 pub enum NTAGCommand {
     GetVersion = 0x60,
@@ -188,6 +234,7 @@ pub enum NTAGCommand {
     ReadSig = 0x3C,
 }
 
+#[derive(Copy, Clone, Eq, PartialEq, Debug)]
 #[repr(u8)]
 pub enum MifareCommand {
     AuthenticationWithKeyA = 0x60,

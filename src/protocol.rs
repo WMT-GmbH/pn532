@@ -12,7 +12,7 @@ const ACK: [u8; 6] = [0x00, 0x00, 0xFF, 0x00, 0xFF, 0x00];
 const HOSTTOPN532: u8 = 0xD4;
 const PN532TOHOST: u8 = 0xD5;
 
-#[derive(Debug)]
+#[derive(Copy, Clone, Eq, PartialEq, Debug)]
 pub enum Error<E: Debug> {
     NACK,
     BadResponseFrame,
@@ -30,6 +30,7 @@ impl<E: Debug> From<E> for Error<E> {
 }
 
 /// `N` >= max(response_len, request.data.len()) + 9
+#[derive(Clone, Debug)]
 pub struct Pn532<I, T, const N: usize = 32> {
     pub interface: I,
     pub timer: T,

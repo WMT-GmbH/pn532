@@ -1,3 +1,5 @@
+//! I2C interfaces
+
 use core::convert::Infallible;
 use core::fmt::Debug;
 use core::task::Poll;
@@ -7,10 +9,14 @@ use embedded_hal::digital::v2::InputPin;
 
 use crate::Interface;
 
-const PN532_I2C_READY: u8 = 0x01;
+/// To be used in `Interface::wait_ready` implementations
+pub const PN532_I2C_READY: u8 = 0x01;
 
-const I2C_ADDRESS: u8 = 0x24;
+/// I2C address of the Pn532
+pub const I2C_ADDRESS: u8 = 0x24;
 
+/// I2C Interface without IRQ pin
+#[derive(Clone, Debug)]
 pub struct I2CInterface<I2C> {
     pub i2c: I2C,
 }
@@ -47,6 +53,8 @@ where
     }
 }
 
+/// I2C Interface with IRQ pin
+#[derive(Clone, Debug)]
 pub struct I2CInterfaceWithIrq<I2C, IRQ> {
     pub i2c: I2C,
     pub irq: IRQ,
