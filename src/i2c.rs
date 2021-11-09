@@ -17,7 +17,13 @@ pub const I2C_ADDRESS: u8 = 0x24;
 
 /// I2C Interface without IRQ pin
 #[derive(Clone, Debug)]
-pub struct I2CInterface<I2C> {
+pub struct I2CInterface<I2C>
+where
+    I2C: Transactional,
+    I2C: Write<Error = <I2C as Transactional>::Error>,
+    I2C: Read<Error = <I2C as Transactional>::Error>,
+    <I2C as Transactional>::Error: Debug,
+{
     pub i2c: I2C,
 }
 
@@ -55,7 +61,14 @@ where
 
 /// I2C Interface with IRQ pin
 #[derive(Clone, Debug)]
-pub struct I2CInterfaceWithIrq<I2C, IRQ> {
+pub struct I2CInterfaceWithIrq<I2C, IRQ>
+where
+    I2C: Transactional,
+    I2C: Write<Error = <I2C as Transactional>::Error>,
+    I2C: Read<Error = <I2C as Transactional>::Error>,
+    <I2C as Transactional>::Error: Debug,
+    IRQ: InputPin<Error = Infallible>,
+{
     pub i2c: I2C,
     pub irq: IRQ,
 }

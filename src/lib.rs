@@ -1,10 +1,51 @@
-//! Pn532
+//! `no_std` implementation of the [`Pn532`] protocol using `embedded_hal` traits.
+//!
+//! Since communication with the Pn532 can be rather slow at times,
+//! communication can be split into multiple parts, a timeout can be provided or an async runtime
+//! can be used.
+//!
+//! The Pn532 supports different serial links. The [`Interface`] trait abstracts
+//! over these different links.
+//!
+//! `Interface` can be manually implemented or one the four provided interface structs can be used:
+//! * [`spi::SPIInterface`]
+//! * [`spi::SPIInterfaceWithIrq`]
+//! * [`i2c::I2CInterface`]
+//! * [`i2c::I2CInterfaceWithIrq`]
+//!
+//! # SPI example
+//! ```
+//! # use pn532::doctesthelper::{NoOpSPI, NoOpCS, NoOpTimer, U32Ext};
+//! use pn532::{Pn532, Request};
+//! use pn532::spi::SPIInterface;
+//!
+//! # let spi = NoOpSPI;
+//! # let cs = NoOpCS;
+//! # let timer = NoOpTimer;
+//! #
+//! // spi, cs and timer are structs implementing their respective embedded_hal traits.
+//!
+//! let interface = SPIInterface {
+//!     spi,
+//!     cs,
+//! };
+//! let mut pn532: Pn532<_, _, 32> = Pn532::new(interface, timer);
+//! if let Ok(uid) = pn532.process(&Request::INLIST_ONE_ISO_A_TARGET, 7, 1000.ms()){
+//!     let result = pn532.process(&Request::ntag_read(10), 17, 50.ms()).unwrap();
+//!     if result[0] == 0x00 {
+//!         println!("page 10: {:?}", &result[1..5]);
+//!     }
+//! }
+//! ```
+//!
+//! # `msb-spi` feature
+//! If you want to use either [`spi::SPIInterface`] or [`spi::SPIInterfaceWithIrq`] and
+//! your peripheral cannot be set to **lsb mode** you need to enable the `msb-spi` feature of this crate.
 
 #![no_std]
 // features should be stabilized soon
 #![feature(future_poll_fn)] // https://github.com/rust-lang/rust/issues/72302
 #![feature(const_generics_defaults)] // https://github.com/rust-lang/rust/pull/90207
-#![warn(missing_docs)]
 
 use core::fmt::Debug;
 use core::task::Poll;
@@ -182,3 +223,7 @@ impl core::convert::TryFrom<u8> for ErrorCode {
         }
     }
 }
+
+#[doc(hidden)]
+// FIXME: #[cfg(doctest)] once https://github.com/rust-lang/rust/issues/67295 is fixed.
+pub mod doctesthelper;

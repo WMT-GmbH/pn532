@@ -5,6 +5,8 @@ edition = "2021"
 
 [dependencies]
 embedded-hal = { version = "0.2.6", features = ["unproven"] }
+nb = "1.0.0"
+void = { version = "1.0.2" , default_features = false}
 
 [features]
 msb-spi = []

@@ -12,14 +12,24 @@ const ACK: [u8; 6] = [0x00, 0x00, 0xFF, 0x00, 0xFF, 0x00];
 const HOSTTOPN532: u8 = 0xD4;
 const PN532TOHOST: u8 = 0xD5;
 
+/// Pn532 Error
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
 pub enum Error<E: Debug> {
-    NACK,
+    /// Could not parse ACK frame
+    BadACK,
+    /// Could not parse response frame
     BadResponseFrame,
+    /// Received a syntax error frame
+    Syntax,
+    /// CRC for either the length or the data is wrong
     CrcError,
+    /// The provided `response_len` was too low
     BufTooSmall,
+    /// Did not receive an ACK frame in time
     TimeoutAck,
+    /// Did not receive a response frame in time
     TimeoutResponse,
+    /// Interface specific Error
     InterfaceError(E),
 }
 
@@ -29,7 +39,28 @@ impl<E: Debug> From<E> for Error<E> {
     }
 }
 
-/// `N` >= max(response_len, request.data.len()) + 9
+/// Main struct of this crate
+///
+/// Provides blocking methods [`process`](Pn532::process) and [`process_async`](Pn532::process_async)
+/// for sending requests and parsing responses.
+///
+/// Other methods can be used if fine-grain control is required.
+///
+/// # Note:
+/// The `Pn532` uses an internal buffer for sending and receiving messages.
+/// The size of the buffer is determined by the `N` type parameter which has a default value of `32`.
+///
+/// Choosing `N` too small will result in **panics**.
+///
+/// The following inequality should hold for all requests and responses:
+/// ```text
+/// N - 9 >= max(response_len, M)
+/// ```
+/// where
+/// * `N` is the const generic type parameter of this struct.
+/// * `response_len` is the largest number passed to
+/// [`receive_response`](Pn532::receive_response), [`process`](Pn532::process) or [`process_async`](Pn532::process_async)
+/// * `M` is the largest const generic type parameter of [`Request`] references passed to any sending methods of this struct
 #[derive(Clone, Debug)]
 pub struct Pn532<I, T, const N: usize = 32> {
     pub interface: I,
@@ -38,6 +69,17 @@ pub struct Pn532<I, T, const N: usize = 32> {
 }
 
 impl<I: Interface, T: CountDown, const N: usize> Pn532<I, T, N> {
+    /// Send a request, wait for an ACK and then wait for a response.
+    ///
+    /// `response_len` is the largest expected length of the returned data.
+    ///
+    /// ```
+    /// # use pn532::doctesthelper::{get_pn532, U32Ext};
+    /// use pn532::Request;
+    ///
+    /// let mut pn532 = get_pn532();
+    /// let result = pn532.process(&Request::GET_FIRMWARE_VERSION, 4, 50.ms());
+    /// ```
     #[inline]
     pub fn process<const M: usize>(
         &mut self,
@@ -71,6 +113,15 @@ impl<I: Interface, T: CountDown, const N: usize> Pn532<I, T, N> {
         self.receive_response(sent_command, response_len)
     }
 
+    /// Send a request and wait for an ACK.
+    ///
+    /// ```
+    /// # use pn532::doctesthelper::{get_pn532, U32Ext};
+    /// use pn532::Request;
+    ///
+    /// let mut pn532 = get_pn532();
+    /// pn532.process_no_response(&Request::INLIST_ONE_ISO_A_TARGET, 5.ms());
+    /// ```
     #[inline]
     pub fn process_no_response<const M: usize>(
         &mut self,
@@ -96,6 +147,7 @@ impl<I: Interface, T: CountDown, const N: usize> Pn532<I, T, N> {
     }
 }
 impl<I: Interface, T, const N: usize> Pn532<I, T, N> {
+    /// Create a Pn532 instance
     pub fn new(interface: I, timer: T) -> Self {
         Pn532 {
             interface,
@@ -104,6 +156,15 @@ impl<I: Interface, T, const N: usize> Pn532<I, T, N> {
         }
     }
 
+    /// Send a request.
+    ///
+    /// ```
+    /// # use pn532::doctesthelper::get_pn532;
+    /// use pn532::Request;
+    ///
+    /// let mut pn532 = get_pn532();
+    /// pn532.send(&Request::GET_FIRMWARE_VERSION);
+    /// ```
     #[inline]
     pub fn send<const M: usize>(&mut self, request: &Request<M>) -> Result<(), Error<I::Error>> {
         // codegen trampoline: https://github.com/rust-lang/rust/issues/77960
@@ -139,16 +200,53 @@ impl<I: Interface, T, const N: usize> Pn532<I, T, N> {
         Ok(())
     }
 
+    /// Receive an ACK frame.
+    /// This should be done after [`send`](Pn532::send) was called and the interface was checked to be ready.
+    ///
+    /// ```
+    /// # use pn532::doctesthelper::get_pn532;
+    /// use core::task::Poll;
+    /// use pn532::{Interface, Request};
+    ///
+    /// let mut pn532 = get_pn532();
+    /// pn532.send(&Request::GET_FIRMWARE_VERSION);
+    /// // do something else
+    /// if let Poll::Ready(Ok(_)) = pn532.interface.wait_ready() {
+    ///     pn532.receive_ack();
+    /// }
+    /// ```
     pub fn receive_ack(&mut self) -> Result<(), Error<I::Error>> {
         let mut ack_buf = [0; 6];
         self.interface.read(&mut ack_buf)?;
         if ack_buf != ACK {
-            Err(Error::NACK)
+            Err(Error::BadACK)
         } else {
             Ok(())
         }
     }
 
+    /// Receive a response frame.
+    /// This should be done after [`send`](Pn532::send) and [`receive_ack`](Pn532::receive_ack) was called and
+    /// the interface was checked to be ready.
+    ///
+    /// `response_len` is the largest expected length of the returned data.
+    ///
+    /// ```
+    /// # use pn532::doctesthelper::get_pn532;
+    /// use core::task::Poll;
+    /// use pn532::{Interface, Request};
+    ///
+    /// let mut pn532 = get_pn532();
+    /// pn532.send(&Request::GET_FIRMWARE_VERSION);
+    /// // do something else
+    /// if let Poll::Ready(Ok(_)) = pn532.interface.wait_ready() {
+    ///     pn532.receive_ack();
+    /// }
+    /// // do something else
+    /// if let Poll::Ready(Ok(_)) = pn532.interface.wait_ready() {
+    ///     let result = pn532.receive_response(Request::GET_FIRMWARE_VERSION.command, 4);
+    /// }
+    /// ```
     pub fn receive_response(
         &mut self,
         sent_command: Command,
@@ -172,6 +270,7 @@ impl<I: Interface, T, const N: usize> Pn532<I, T, N> {
 }
 
 impl<I: Interface, const N: usize> Pn532<I, (), N> {
+    /// Create a Pn532 instance without a timer
     pub fn new_async(interface: I) -> Self {
         Pn532 {
             interface,
@@ -180,6 +279,17 @@ impl<I: Interface, const N: usize> Pn532<I, (), N> {
         }
     }
 
+    /// Send a request, wait for an ACK and then wait for a response.
+    ///
+    /// `response_len` is the largest expected length of the returned data.
+    ///
+    /// ```
+    /// # use pn532::doctesthelper::get_async_pn532;
+    /// use pn532::Request;
+    ///
+    /// let mut pn532 = get_async_pn532();
+    /// let future = pn532.process_async(&Request::GET_FIRMWARE_VERSION, 4);
+    /// ```
     #[inline]
     pub async fn process_async<const M: usize>(
         &mut self,
@@ -202,6 +312,14 @@ impl<I: Interface, const N: usize> Pn532<I, (), N> {
         self.receive_response(sent_command, response_len)
     }
 
+    /// Send a request and wait for an ACK.
+    ///
+    /// ```
+    /// # use pn532::doctesthelper::{get_async_pn532, U32Ext};
+    /// use pn532::Request;
+    ///
+    /// let mut pn532 = get_async_pn532();
+    /// let future = pn532.process_no_response_async(&Request::INLIST_ONE_ISO_A_TARGET);
     #[inline]
     pub async fn process_no_response_async<const M: usize>(
         &mut self,
@@ -230,8 +348,15 @@ fn parse_response<E: Debug>(
     }
     // Check length & length checksum
     let frame_len = response_buf[3];
-    if frame_len < 2 || (frame_len.wrapping_add(response_buf[4])) != 0 {
+    if (frame_len.wrapping_add(response_buf[4])) != 0 {
+        return Err(Error::CrcError);
+    }
+    if frame_len == 0 {
         return Err(Error::BadResponseFrame);
+    }
+    if frame_len == 1 {
+        // 6.2.1.5 Error frame
+        return Err(Error::Syntax);
     }
     match response_buf.get(5 + frame_len as usize + 1) {
         None => {

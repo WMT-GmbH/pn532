@@ -1,5 +1,6 @@
 //! Pn532 Requests
 
+/// Pn532 Request consisting of a [`Command`] and extra command data
 #[derive(Clone, Eq, PartialEq, Debug)]
 pub struct Request<const N: usize> {
     pub command: Command,
