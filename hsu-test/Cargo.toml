@@ -1,0 +1,21 @@
+[package]
+name = "hsu-test-util"
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+
+[[bin]]
+name = "hsu-test-util"
+path = "main.rs"
+
+[dependencies]
+log = "0.4"
+env_logger = "0.7"
+clap = "2.33.3"
+serialport = "4.0.1"
+linux-embedded-hal = "0.3.2"
+
+[dependencies.pn532]
+path = ".."
+version = "0.2.0"
+
