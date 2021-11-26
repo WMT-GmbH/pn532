@@ -15,9 +15,10 @@
 //!
 //! # SPI example
 //! ```
-//! # use pn532::doctesthelper::{NoOpSPI, NoOpCS, NoOpTimer, U32Ext};
+//! # use pn532::doctesthelper::{NoOpSPI, NoOpCS, NoOpTimer};
 //! use pn532::{Pn532, Request};
 //! use pn532::spi::SPIInterface;
+//! use pn532::IntoDuration; // trait for `ms()`, your HAL might have its own
 //!
 //! # let spi = NoOpSPI;
 //! # let cs = NoOpCS;
@@ -49,6 +50,7 @@
 
 use core::fmt::Debug;
 use core::task::Poll;
+use core::time::Duration;
 
 pub use crate::protocol::{Error, Pn532};
 pub use crate::requests::Request;
@@ -223,6 +225,22 @@ impl core::convert::TryFrom<u8> for ErrorCode {
         }
     }
 }
+
+/// Extension trait with convenience methods for turning `u64` into `Duration`
+pub trait IntoDuration {
+    fn ms(self) -> Duration;
+    fn us(self) -> Duration;
+}
+
+impl IntoDuration for u64 {
+    fn ms(self) -> Duration {
+        Duration::from_millis(self)
+    }
+    fn us(self) -> Duration {
+        Duration::from_micros(self)
+    }
+}
+
 
 #[doc(hidden)]
 // FIXME: #[cfg(doctest)] once https://github.com/rust-lang/rust/issues/67295 is fixed.

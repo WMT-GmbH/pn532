@@ -74,8 +74,9 @@ impl<I: Interface, T: CountDown, const N: usize> Pn532<I, T, N> {
     /// `response_len` is the largest expected length of the returned data.
     ///
     /// ```
-    /// # use pn532::doctesthelper::{get_pn532, U32Ext};
+    /// # use pn532::doctesthelper::get_pn532;
     /// use pn532::Request;
+    /// use pn532::IntoDuration; // trait for `ms()`, your HAL might have its own
     ///
     /// let mut pn532 = get_pn532();
     /// let result = pn532.process(&Request::GET_FIRMWARE_VERSION, 4, 50.ms());
@@ -116,8 +117,9 @@ impl<I: Interface, T: CountDown, const N: usize> Pn532<I, T, N> {
     /// Send a request and wait for an ACK.
     ///
     /// ```
-    /// # use pn532::doctesthelper::{get_pn532, U32Ext};
+    /// # use pn532::doctesthelper::get_pn532;
     /// use pn532::Request;
+    /// use pn532::IntoDuration; // trait for `ms()`, your HAL might have its own
     ///
     /// let mut pn532 = get_pn532();
     /// pn532.process_no_response(&Request::INLIST_ONE_ISO_A_TARGET, 5.ms());
@@ -315,7 +317,7 @@ impl<I: Interface, const N: usize> Pn532<I, (), N> {
     /// Send a request and wait for an ACK.
     ///
     /// ```
-    /// # use pn532::doctesthelper::{get_async_pn532, U32Ext};
+    /// # use pn532::doctesthelper::get_async_pn532;
     /// use pn532::Request;
     ///
     /// let mut pn532 = get_async_pn532();

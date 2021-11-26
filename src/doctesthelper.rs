@@ -1,4 +1,5 @@
 use core::convert::Infallible;
+use core::time::Duration;
 
 use embedded_hal::blocking::spi::{Transfer, Write};
 use embedded_hal::digital::v2::OutputPin;
@@ -62,7 +63,7 @@ impl Transfer<u8> for NoOpSPI {
 }
 
 impl CountDown for NoOpTimer {
-    type Time = MicroSecond;
+    type Time = Duration;
 
     fn start<T>(&mut self, _: T)
     where
@@ -72,18 +73,5 @@ impl CountDown for NoOpTimer {
 
     fn wait(&mut self) -> nb::Result<(), void::Void> {
         nb::Result::Ok(())
-    }
-}
-
-#[derive(Debug, PartialEq, PartialOrd, Clone, Copy)]
-pub struct MicroSecond(pub u32);
-
-pub trait U32Ext {
-    fn ms(self) -> MicroSecond;
-}
-
-impl U32Ext for u32 {
-    fn ms(self) -> MicroSecond {
-        MicroSecond(self.saturating_mul(1_000))
     }
 }
