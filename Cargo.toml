@@ -19,15 +19,19 @@ keywords = [
 [dependencies]
 embedded-hal = { version = "0.2.6", features = ["unproven"] }
 nb = "1.0.0"
-void = { version = "1.0.2" , default_features = false}
+void = { version = "1.0.2", default_features = false }
+serialport = { version = "4.0.1", optional = true }
 
 [features]
 msb-spi = []
+std = ["serialport"]
+
+[package.metadata.docs.rs]
+all-features = true
 
 [dev-dependencies]
 # hsu-test-serialport
 log = "0.4"
 env_logger = "0.7"
 clap = "2.33.3"
-serialport = "4.0.1"
 linux-embedded-hal = "0.3.2"

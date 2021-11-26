@@ -7,11 +7,13 @@
 //! The Pn532 supports different serial links. The [`Interface`] trait abstracts
 //! over these different links.
 //!
-//! `Interface` can be manually implemented or one the four provided interface structs can be used:
+//! `Interface` can be manually implemented or one these provided interface structs can be used:
 //! * [`spi::SPIInterface`]
 //! * [`spi::SPIInterfaceWithIrq`]
 //! * [`i2c::I2CInterface`]
 //! * [`i2c::I2CInterfaceWithIrq`]
+//! * [`serialport::SerialPortInterface`]
+//! * [`serialport::SerialPortInterfaceWithIrq`]
 //!
 //! # SPI example
 //! ```
@@ -43,7 +45,9 @@
 //! If you want to use either [`spi::SPIInterface`] or [`spi::SPIInterfaceWithIrq`] and
 //! your peripheral cannot be set to **lsb mode** you need to enable the `msb-spi` feature of this crate.
 
-#![no_std]
+#![cfg_attr(not(any(feature = "std", doc)), no_std)]
+#![cfg_attr(doc, feature(doc_cfg))]
+
 // features should be stabilized soon
 #![feature(future_poll_fn)] // https://github.com/rust-lang/rust/issues/72302
 #![feature(const_generics_defaults)] // https://github.com/rust-lang/rust/pull/90207
@@ -56,6 +60,9 @@ pub use crate::protocol::{Error, Pn532};
 pub use crate::requests::Request;
 
 pub mod i2c;
+#[cfg(feature = "std")]
+#[cfg_attr(doc, doc(cfg(feature = "std")))]
+pub mod serialport;
 mod protocol;
 pub mod requests;
 pub mod spi;
