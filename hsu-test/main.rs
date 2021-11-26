@@ -29,7 +29,11 @@ impl Interface for SerialPortInterface {
     }
 
     fn wait_ready(&mut self) -> Poll<Result<(), Self::Error>> {
-        Poll::Ready(Ok(()))
+        let waiting = self.port.bytes_to_read()?;
+        match waiting {
+            0 => Poll::Pending,
+            1.. => Poll::Ready(Ok(())),
+        }
     }
 
     fn read(&mut self, buf: &mut [u8]) -> Result<(), Self::Error> {
