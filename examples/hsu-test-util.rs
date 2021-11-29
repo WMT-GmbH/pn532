@@ -84,15 +84,8 @@ fn main() {
         println!("Unable to communicate with device.");
     }
 
-    /*
-    if let Ok(uid) = pn532.process(&Request::INLIST_ONE_ISO_A_TARGET, 7, Duration::from_millis(1000)){
-        println!("Got uid: {:?}", uid);
-        let result = pn532.process(&Request::ntag_read(10), 17, Duration::from_millis(50)).unwrap();
-        if result[0] == 0x00 {
-            println!("page 10: {:?}", &result[1..5]);
-        }
-    } else {
-        println!("Failed to get iso target");
-    }
-    */
+    // TODO: Implement other functionality:
+    // * list capabilities
+    // * list cards
+    // * wait for NFC event
 }
