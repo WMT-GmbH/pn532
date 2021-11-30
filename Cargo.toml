@@ -23,3 +23,11 @@ void = { version = "1.0.2" , default_features = false}
 
 [features]
 msb-spi = []
+
+[dev-dependencies]
+# hsu-test-serialport
+log = "0.4"
+env_logger = "0.7"
+clap = "2.33.3"
+serialport = "4.0.1"
+linux-embedded-hal = "0.3.2"
