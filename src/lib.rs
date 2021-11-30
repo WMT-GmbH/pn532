@@ -13,7 +13,6 @@
 //! * [`i2c::I2CInterface`]
 //! * [`i2c::I2CInterfaceWithIrq`]
 //! * [`serialport::SerialPortInterface`]
-//! * [`serialport::SerialPortInterfaceWithIrq`]
 //!
 //! # SPI example
 //! ```
