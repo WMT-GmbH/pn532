@@ -1,48 +1,16 @@
-use clap::{App, Arg};
+//! Usage:
+//! cargo run --example hsu-test-util --features std -- --serial <DEVICE>
+
 use std::time::Duration;
 
-use pn532::Interface;
+use clap::{App, Arg};
+
+use pn532::serialport::{SerialPortInterface, SysTimer};
 use pn532::{Pn532, Request};
-
-use core::task::Poll;
-
-use std::io::{Read, Write};
-
-use linux_embedded_hal as hal;
 
 const PROGRAM: Option<&'static str> = option_env!("CARGO_PKG_NAME");
 const VERSION: Option<&'static str> = option_env!("CARGO_PKG_VERSION");
 const DESCRIPTION: Option<&'static str> = option_env!("CARGO_PKG_DESCRIPTION");
-
-struct SerialPortInterface {
-    pub port: Box<dyn serialport::SerialPort>,
-}
-
-impl Interface for SerialPortInterface {
-    type Error = std::io::Error;
-
-    fn write(&mut self, frame: &[u8]) -> Result<(), Self::Error> {
-        match self.port.write(frame) {
-            Ok(_) => Ok(()),
-            Err(e) => Err(e),
-        }
-    }
-
-    fn wait_ready(&mut self) -> Poll<Result<(), Self::Error>> {
-        let waiting = self.port.bytes_to_read()?;
-        match waiting {
-            0 => Poll::Pending,
-            1.. => Poll::Ready(Ok(())),
-        }
-    }
-
-    fn read(&mut self, buf: &mut [u8]) -> Result<(), Self::Error> {
-        match self.port.read(buf) {
-            Ok(_) => Ok(()),
-            Err(e) => Err(e),
-        }
-    }
-}
 
 fn main() {
     env_logger::init();
@@ -70,9 +38,11 @@ fn main() {
 
     let interface = SerialPortInterface { port: serial };
 
-    let timer = hal::SysTimer::new();
+    let timer = SysTimer::new();
 
     let mut pn532: Pn532<_, _, 32> = Pn532::new(interface, timer);
+
+    pn532.interface.send_wakeup_message().unwrap(); // required for HSU
 
     if let Ok(fw) = pn532.process(
         &Request::GET_FIRMWARE_VERSION,

@@ -29,9 +29,12 @@ std = ["serialport"]
 [package.metadata.docs.rs]
 all-features = true
 
+[[example]]
+name = "hsu-test-util"
+required-features = ["std"]
+
 [dev-dependencies]
 # hsu-test-serialport
 log = "0.4"
 env_logger = "0.7"
 clap = "2.33.3"
-linux-embedded-hal = "0.3.2"
