@@ -47,10 +47,6 @@
 #![cfg_attr(not(any(feature = "std", doc)), no_std)]
 #![cfg_attr(doc, feature(doc_cfg))]
 
-// features should be stabilized soon
-#![feature(future_poll_fn)] // https://github.com/rust-lang/rust/issues/72302
-#![feature(const_generics_defaults)] // https://github.com/rust-lang/rust/pull/90207
-
 use core::fmt::Debug;
 use core::task::Poll;
 use core::time::Duration;
