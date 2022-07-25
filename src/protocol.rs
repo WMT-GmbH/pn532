@@ -9,14 +9,14 @@ const PREAMBLE: [u8; 3] = [0x00, 0x00, 0xFF];
 const POSTAMBLE: u8 = 0x00;
 const ACK: [u8; 6] = [0x00, 0x00, 0xFF, 0x00, 0xFF, 0x00];
 
-const HOSTTOPN532: u8 = 0xD4;
-const PN532TOHOST: u8 = 0xD5;
+const HOST_TO_PN532: u8 = 0xD4;
+const PN532_TO_HOST: u8 = 0xD5;
 
 /// Pn532 Error
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
 pub enum Error<E: Debug> {
     /// Could not parse ACK frame
-    BadACK,
+    BadAck,
     /// Could not parse response frame
     BadResponseFrame,
     /// Received a syntax error frame
@@ -74,7 +74,7 @@ impl<I: Interface, T: CountDown, const N: usize> Pn532<I, T, N> {
     /// `response_len` is the largest expected length of the returned data.
     ///
     /// ```
-    /// # use pn532::doctesthelper::get_pn532;
+    /// # use pn532::doc_test_helper::get_pn532;
     /// use pn532::Request;
     /// use pn532::IntoDuration; // trait for `ms()`, your HAL might have its own
     ///
@@ -117,7 +117,7 @@ impl<I: Interface, T: CountDown, const N: usize> Pn532<I, T, N> {
     /// Send a request and wait for an ACK.
     ///
     /// ```
-    /// # use pn532::doctesthelper::get_pn532;
+    /// # use pn532::doc_test_helper::get_pn532;
     /// use pn532::Request;
     /// use pn532::IntoDuration; // trait for `ms()`, your HAL might have its own
     ///
@@ -161,7 +161,7 @@ impl<I: Interface, T, const N: usize> Pn532<I, T, N> {
     /// Send a request.
     ///
     /// ```
-    /// # use pn532::doctesthelper::get_pn532;
+    /// # use pn532::doc_test_helper::get_pn532;
     /// use pn532::Request;
     ///
     /// let mut pn532 = get_pn532();
@@ -176,7 +176,7 @@ impl<I: Interface, T, const N: usize> Pn532<I, T, N> {
         let data_len = request.data.len();
         let frame_len = 2 + data_len as u8; // frame identifier + command + data
 
-        let mut data_sum = HOSTTOPN532.wrapping_add(request.command as u8); // sum(command + data + frame identifier)
+        let mut data_sum = HOST_TO_PN532.wrapping_add(request.command as u8); // sum(command + data + frame identifier)
         for &byte in request.data {
             data_sum = data_sum.wrapping_add(byte);
         }
@@ -190,7 +190,7 @@ impl<I: Interface, T, const N: usize> Pn532<I, T, N> {
         self.buf[2] = PREAMBLE[2];
         self.buf[3] = frame_len;
         self.buf[4] = to_checksum(frame_len);
-        self.buf[5] = HOSTTOPN532;
+        self.buf[5] = HOST_TO_PN532;
         self.buf[6] = request.command as u8;
 
         self.buf[7..7 + data_len].copy_from_slice(request.data);
@@ -206,7 +206,7 @@ impl<I: Interface, T, const N: usize> Pn532<I, T, N> {
     /// This should be done after [`send`](Pn532::send) was called and the interface was checked to be ready.
     ///
     /// ```
-    /// # use pn532::doctesthelper::get_pn532;
+    /// # use pn532::doc_test_helper::get_pn532;
     /// use core::task::Poll;
     /// use pn532::{Interface, Request};
     ///
@@ -221,7 +221,7 @@ impl<I: Interface, T, const N: usize> Pn532<I, T, N> {
         let mut ack_buf = [0; 6];
         self.interface.read(&mut ack_buf)?;
         if ack_buf != ACK {
-            Err(Error::BadACK)
+            Err(Error::BadAck)
         } else {
             Ok(())
         }
@@ -234,7 +234,7 @@ impl<I: Interface, T, const N: usize> Pn532<I, T, N> {
     /// `response_len` is the largest expected length of the returned data.
     ///
     /// ```
-    /// # use pn532::doctesthelper::get_pn532;
+    /// # use pn532::doc_test_helper::get_pn532;
     /// use core::task::Poll;
     /// use pn532::{Interface, Request};
     ///
@@ -286,7 +286,7 @@ impl<I: Interface, const N: usize> Pn532<I, (), N> {
     /// `response_len` is the largest expected length of the returned data.
     ///
     /// ```
-    /// # use pn532::doctesthelper::get_async_pn532;
+    /// # use pn532::doc_test_helper::get_async_pn532;
     /// use pn532::Request;
     ///
     /// let mut pn532 = get_async_pn532();
@@ -317,7 +317,7 @@ impl<I: Interface, const N: usize> Pn532<I, (), N> {
     /// Send a request and wait for an ACK.
     ///
     /// ```
-    /// # use pn532::doctesthelper::get_async_pn532;
+    /// # use pn532::doc_test_helper::get_async_pn532;
     /// use pn532::Request;
     ///
     /// let mut pn532 = get_async_pn532();
@@ -370,7 +370,7 @@ fn parse_response<E: Debug>(
         }
     }
 
-    if response_buf[5] != PN532TOHOST || response_buf[6] != expected_response_command {
+    if response_buf[5] != PN532_TO_HOST || response_buf[6] != expected_response_command {
         return Err(Error::BadResponseFrame);
     }
     // Check frame checksum value matches bytes

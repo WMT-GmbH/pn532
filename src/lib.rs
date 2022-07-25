@@ -16,7 +16,7 @@
 //!
 //! # SPI example
 //! ```
-//! # use pn532::doctesthelper::{NoOpSPI, NoOpCS, NoOpTimer};
+//! # use pn532::doc_test_helper::{NoOpSPI, NoOpCS, NoOpTimer};
 //! use pn532::{Pn532, Request};
 //! use pn532::spi::SPIInterface;
 //! use pn532::IntoDuration; // trait for `ms()`, your HAL might have its own
@@ -184,11 +184,11 @@ pub enum ErrorCode {
     CardHasDisappeared = 0x2B,
     /// Mismatch between the NFCID3 initiator and the NFCID3
     /// target in DEP 212/424 kbps passive.
-    Nfcid3InitiatorTargetMismatch = 0x2C,
+    NfcId3InitiatorTargetMismatch = 0x2C,
     /// An over-current event has been detected
     OverCurrent = 0x2D,
     /// NAD missing in DEP frame
-    NadMsssing = 0x2E,
+    NadMissing = 0x2E,
 }
 
 impl core::convert::TryFrom<u8> for ErrorCode {
@@ -220,9 +220,9 @@ impl core::convert::TryFrom<u8> for ErrorCode {
             0x29 => Ok(ErrorCode::TargetHasBeenReleased),
             0x2A => Ok(ErrorCode::CardHasBeenExchanged),
             0x2B => Ok(ErrorCode::CardHasDisappeared),
-            0x2C => Ok(ErrorCode::Nfcid3InitiatorTargetMismatch),
+            0x2C => Ok(ErrorCode::NfcId3InitiatorTargetMismatch),
             0x2D => Ok(ErrorCode::OverCurrent),
-            0x2E => Ok(ErrorCode::NadMsssing),
+            0x2E => Ok(ErrorCode::NadMissing),
             _ => Err(()),
         }
     }
@@ -246,4 +246,4 @@ impl IntoDuration for u64 {
 
 #[doc(hidden)]
 // FIXME: #[cfg(doctest)] once https://github.com/rust-lang/rust/issues/67295 is fixed.
-pub mod doctesthelper;
+pub mod doc_test_helper;
