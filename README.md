@@ -42,6 +42,10 @@ if let Ok(uid) = pn532.process(&Request::INLIST_ONE_ISO_A_TARGET, 7, 1000.ms()){
 If you want to use either `spi::SPIInterface` or `spi::SPIInterfaceWithIrq` and
 your peripheral cannot be set to **lsb mode** you need to enable the `msb-spi` feature of this crate.
 
+## `std` feature
+Enable the std feature to use `serialport::SerialPortInterface`. 
+Only works for [targets](https://github.com/serialport/serialport-rs#platform-support) supported by the `serialport` crate.
+
 #### License
 <sup>
 Licensed under either of <a href="LICENSE-APACHE">Apache License, Version

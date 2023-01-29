@@ -43,6 +43,10 @@
 //! # `msb-spi` feature
 //! If you want to use either [`spi::SPIInterface`] or [`spi::SPIInterfaceWithIrq`] and
 //! your peripheral cannot be set to **lsb mode** you need to enable the `msb-spi` feature of this crate.
+//!
+//! # `std` feature
+//! Enable the std feature to use [`serialport::SerialPortInterface`]
+//! Only works for [targets](https://github.com/serialport/serialport-rs#platform-support) supported by the `serialport` crate.
 
 #![cfg_attr(not(any(feature = "std", doc)), no_std)]
 #![cfg_attr(doc, feature(doc_cfg))]
@@ -55,11 +59,11 @@ pub use crate::protocol::{Error, Pn532};
 pub use crate::requests::Request;
 
 pub mod i2c;
+mod protocol;
+pub mod requests;
 #[cfg(feature = "std")]
 #[cfg_attr(doc, doc(cfg(feature = "std")))]
 pub mod serialport;
-mod protocol;
-pub mod requests;
 pub mod spi;
 
 /// Abstraction over the different serial links.
@@ -242,7 +246,6 @@ impl IntoDuration for u64 {
         Duration::from_micros(self)
     }
 }
-
 
 #[doc(hidden)]
 // FIXME: #[cfg(doctest)] once https://github.com/rust-lang/rust/issues/67295 is fixed.
