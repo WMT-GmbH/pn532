@@ -16,12 +16,12 @@
 //!
 //! # SPI example
 //! ```
-//! # use pn532::doc_test_helper::{NoOpSPI, NoOpCS, NoOpTimer};
+//! # use pn532::doc_test_helper::{NoOpBus, NoOpCS, NoOpTimer};
 //! use pn532::{Pn532, Request};
 //! use pn532::spi::SPIInterface;
 //! use pn532::IntoDuration; // trait for `ms()`, your HAL might have its own
 //!
-//! # let spi = NoOpSPI;
+//! # let spi = NoOpBus;
 //! # let cs = NoOpCS;
 //! # let timer = NoOpTimer;
 //! #
@@ -54,12 +54,14 @@ use core::time::Duration;
 pub use crate::protocol::{Error, Pn532};
 pub use crate::requests::Request;
 
+#[cfg(feature = "eh1")]
+pub mod eh1;
 pub mod i2c;
+mod protocol;
+pub mod requests;
 #[cfg(feature = "std")]
 #[cfg_attr(doc, doc(cfg(feature = "std")))]
 pub mod serialport;
-mod protocol;
-pub mod requests;
 pub mod spi;
 
 /// Abstraction over the different serial links.
@@ -242,7 +244,6 @@ impl IntoDuration for u64 {
         Duration::from_micros(self)
     }
 }
-
 
 #[doc(hidden)]
 // FIXME: #[cfg(doctest)] once https://github.com/rust-lang/rust/issues/67295 is fixed.

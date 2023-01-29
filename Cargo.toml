@@ -17,7 +17,8 @@ keywords = [
 ]
 
 [dependencies]
-embedded-hal = { version = "0.2.6", features = ["unproven"] }
+embedded-hal = { version = "0.2.7", features = ["unproven"] }
+embedded-hal-1 = { version = "=1.0.0-alpha.9", optional = true, package = "embedded-hal" }
 nb = "1.0.0"
 void = { version = "1.0.2", default_features = false }
 serialport = { version = "4.0.1", optional = true }
@@ -25,6 +26,7 @@ serialport = { version = "4.0.1", optional = true }
 [features]
 msb-spi = []
 std = ["serialport"]
+eh1 = ["embedded-hal-1"]
 
 [package.metadata.docs.rs]
 all-features = true
