@@ -71,9 +71,13 @@ where
     }
 
     fn wait_ready(&mut self) -> Poll<Result<(), Self::Error>> {
-        self.spi.write(&[PN532_SPI_STATREAD])?;
         let mut buf = [0x00];
+
+        self.cs.set_low().ok();
+        self.spi.write(&[PN532_SPI_STATREAD])?;
         self.spi.transfer(&mut buf)?;
+        self.cs.set_high().ok();
+
         if buf[0] == PN532_SPI_READY {
             Poll::Ready(Ok(()))
         } else {
