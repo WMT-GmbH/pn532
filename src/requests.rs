@@ -93,6 +93,56 @@ impl Request<0> {
             ],
         )
     }
+
+    pub const fn initialize_as_target(
+        mode: TargetMode,
+        mifare_params: TargetMifareParams,
+        felica_params: TargetFelicaParams,
+        nfcid3t: [u8; 10],
+    ) -> Request<37> {
+        Request::new(
+            Command::TgInitAsTarget,
+            [
+                mode as u8,
+                mifare_params.sens_res[0],
+                mifare_params.sens_res[1],
+                mifare_params.nfcid1t[0],
+                mifare_params.nfcid1t[1],
+                mifare_params.nfcid1t[2],
+                mifare_params.sel_res as u8,
+                felica_params.fncid2t[0],
+                felica_params.fncid2t[1],
+                felica_params.fncid2t[2],
+                felica_params.fncid2t[3],
+                felica_params.fncid2t[4],
+                felica_params.fncid2t[5],
+                felica_params.fncid2t[6],
+                felica_params.fncid2t[7],
+                felica_params.pad[0],
+                felica_params.pad[1],
+                felica_params.pad[2],
+                felica_params.pad[3],
+                felica_params.pad[4],
+                felica_params.pad[5],
+                felica_params.pad[6],
+                felica_params.pad[7],
+                felica_params.system_code[0],
+                felica_params.system_code[1],
+                nfcid3t[0],
+                nfcid3t[1],
+                nfcid3t[2],
+                nfcid3t[3],
+                nfcid3t[4],
+                nfcid3t[5],
+                nfcid3t[6],
+                nfcid3t[7],
+                nfcid3t[8],
+                nfcid3t[9],
+                0, // no general bytes
+                0, // no historical bytes
+            ],
+        )
+    }
 }
 
 /// Commands supported by the Pn532
@@ -248,4 +298,65 @@ pub enum MifareCommand {
     Increment = 0xC1,
     Restore = 0xC2,
     Transfer = 0xB0,
+}
+
+/// Indicates which target mode the PN532 should respect
+#[derive(Copy, Clone, Eq, PartialEq, Debug)]
+#[repr(u8)]
+pub enum TargetMode {
+    // TODO is this a valid mode?
+    /// Accept all target modes
+    Any = 0b000,
+    /// Configure the PN532 to accept to be initialized
+    /// only in passive mode, i.e. to refuse active communication mode
+    PassiveOnly = 0b001,
+    /// Configure the PN532 to accept to be initialized only
+    /// as DEP target, i.e. receiving an ATR_REQ frame. The PN532 can be
+    /// activated either in passive or active mode, but if the PN532 receives a
+    /// proprietary command frame as first command following AutoColl process, it
+    /// will be rejected and the PN532 returns automatically in the AutoColl state
+    DEPOnly = 0b010,
+    /// Configure the PN532 to accept to be initialized only
+    /// as ISO/IEC14443-4 PICC, i.e. receiving an RATS frame.
+    /// If the PN532 receives another command frame as first command following
+    /// AutoColl process, it will be rejected and the PN532 returns automatically in
+    /// the AutoColl state.
+    PICCOnly = 0b100,
+    /// PassiveOnly + DEPOnly
+    PassiveDEPOnly = 0b011,
+    /// PassiveOnly + PICCOnly
+    PassivePICCOnly = 0b101,
+}
+
+/// The information needed to be able to be activated at 106 kbps in passive mode
+#[derive(Copy, Clone, Eq, PartialEq, Debug)]
+pub struct TargetMifareParams {
+    /// 2 bytes LSB first, as defined in ISO/IEC14443-3
+    pub sens_res: [u8; 2],
+    /// has a fixed length of 3 bytes containing the nfcid11 to nfcid13 bytes.
+    /// Indeed, the PN532 can handle only nfcid1t in single size
+    pub nfcid1t: [u8; 3],
+    pub sel_res: TargetSelRes,
+}
+
+/// Part of TargetMifareParams
+#[derive(Copy, Clone, Eq, PartialEq, Debug)]
+#[repr(u8)]
+pub enum TargetSelRes {
+    DEP = 0x40,
+    /// ISO/IEC14443-4 PICC emulation
+    PICC = 0x20,
+    /// both DEP and emulation of ISO/IEC14443-4 PICC
+    DEPandPICC = 0x60,
+}
+
+/// The information to be able to respond to a polling request
+/// at 212/424 kbps in passive mode
+#[derive(Copy, Clone, Eq, PartialEq, Debug)]
+pub struct TargetFelicaParams {
+    pub fncid2t: [u8; 8],
+    pub pad: [u8; 8],
+    /// These two bytes are returned in the POL_RES frame
+    /// if the 4th byte of the incoming POL_REQ command frame is 0x01.
+    pub system_code: [u8; 2],
 }
