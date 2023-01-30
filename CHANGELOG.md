@@ -4,8 +4,6 @@
 
 ### Added
 
-- Removed now stabilized nightly features
-
 ### Changed
 
 - renamed some enum variants #3
@@ -16,3 +14,12 @@
 ### Fixed
 
 - Added missing chip select toggle in SPIInterface (without IRQ) #7
+
+## [0.2.2]
+
+### Added
+- Removed now stabilized nightly features
+
+### Changed
+
+### Fixed
