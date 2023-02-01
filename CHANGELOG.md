@@ -14,6 +14,7 @@
 ### Fixed
 
 - Added missing chip select toggle in SPIInterface (without IRQ) #7
+- tell the async excecutor to poll until `wait_ready` returns `Ready` #12
 
 ## [0.2.2]
 
