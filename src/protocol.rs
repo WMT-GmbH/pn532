@@ -1,4 +1,7 @@
 use core::fmt::Debug;
+use core::future::Future;
+use core::pin::Pin;
+use core::task::{Context, Poll};
 
 use embedded_hal::timer::CountDown;
 
@@ -308,9 +311,9 @@ impl<I: Interface, const N: usize> Pn532<I, (), N> {
     ) -> Result<&[u8], Error<I::Error>> {
         let sent_command = request.command;
         self._send(request)?;
-        core::future::poll_fn(|_| self.interface.wait_ready()).await?;
+        self.wait_ready_future().await?;
         self.receive_ack()?;
-        core::future::poll_fn(|_| self.interface.wait_ready()).await?;
+        self.wait_ready_future().await?;
         self.receive_response(sent_command, response_len)
     }
 
@@ -335,9 +338,15 @@ impl<I: Interface, const N: usize> Pn532<I, (), N> {
         request: BorrowedRequest<'_>,
     ) -> Result<(), Error<I::Error>> {
         self._send(request)?;
-        core::future::poll_fn(|_| self.interface.wait_ready()).await?;
+        self.wait_ready_future().await?;
         self.receive_ack()?;
         Ok(())
+    }
+
+    fn wait_ready_future(&mut self) -> WaitReadyFuture<I> {
+        WaitReadyFuture {
+            interface: &mut self.interface,
+        }
     }
 }
 
@@ -382,4 +391,20 @@ fn parse_response<E: Debug>(
     }
     // Adjust response buf and return it
     Ok(&response_buf[7..5 + frame_len as usize])
+}
+
+struct WaitReadyFuture<'a, I> {
+    interface: &'a mut I,
+}
+
+impl<'a, I: Interface> Future for WaitReadyFuture<'a, I> {
+    type Output = Result<(), I::Error>;
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let poll = self.interface.wait_ready();
+        if poll.is_pending() {
+            // tell the excecutor to poll this future again
+            cx.waker().clone().wake();
+        }
+        poll
+    }
 }
