@@ -20,7 +20,7 @@ over these different links.
 
 ## SPI example
 ```rust
-use pn532::{Pn532, Request};
+use pn532::{requests::SAMMode, spi::SPIInterface, Pn532, Request};
 use pn532::spi::SPIInterface;
 
 // spi, cs and timer are structs implementing their respective embedded_hal traits.
@@ -30,6 +30,9 @@ let interface = SPIInterface {
     cs,
 };
 let mut pn532: Pn532<_, _, 32> = Pn532::new(interface, timer);
+if let Err(e) = pn532.process(&Request::sam_configuration(SAMMode::Normal, false), 0, 50.ms()){
+    println!("Could not initialize PN532: {e:?}")
+}
 if let Ok(uid) = pn532.process(&Request::INLIST_ONE_ISO_A_TARGET, 7, 1000.ms()){
     let result = pn532.process(&Request::ntag_read(10), 17, 50.ms()).unwrap();
     if result[0] == 0x00 {

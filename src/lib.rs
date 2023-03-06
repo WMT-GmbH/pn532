@@ -17,8 +17,7 @@
 //! # SPI example
 //! ```
 //! # use pn532::doc_test_helper::{NoOpSPI, NoOpCS, NoOpTimer};
-//! use pn532::{Pn532, Request};
-//! use pn532::spi::SPIInterface;
+//! use pn532::{requests::SAMMode, spi::SPIInterface, Pn532, Request};
 //! use pn532::IntoDuration; // trait for `ms()`, your HAL might have its own
 //!
 //! # let spi = NoOpSPI;
@@ -32,6 +31,9 @@
 //!     cs,
 //! };
 //! let mut pn532: Pn532<_, _, 32> = Pn532::new(interface, timer);
+//! if let Err(e) = pn532.process(&Request::sam_configuration(SAMMode::Normal, false), 0, 50.ms()){
+//!     println!("Could not initialize PN532: {e:?}")
+//! }
 //! if let Ok(uid) = pn532.process(&Request::INLIST_ONE_ISO_A_TARGET, 7, 1000.ms()){
 //!     let result = pn532.process(&Request::ntag_read(10), 17, 50.ms()).unwrap();
 //!     if result[0] == 0x00 {
