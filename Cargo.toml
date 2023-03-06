@@ -1,7 +1,7 @@
 [package]
 name = "pn532"
 description = "PN532 protocol implementation"
-version = "0.2.2"
+version = "0.3.1"
 edition = "2021"
 repository = "https://github.com/WMT-GmbH/pn532"
 license = "MIT OR Apache-2.0"
