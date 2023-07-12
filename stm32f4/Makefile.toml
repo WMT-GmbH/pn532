@@ -1,0 +1,30 @@
+# use cargo-binutils to transform the output of Cargo (ELF) into binary format
+[tasks.objcopy]
+command = "cargo"
+args= [
+    "objcopy",
+    "--bin", "stm32f4",
+    "--release",
+    "--",
+    "-O", "binary",
+    "target/thumbv7em-none-eabihf/release/stm32f4.bin"
+]
+
+# use dfu-util to flash the binary
+[tasks.dfu]
+command = "dfu-util"
+args = [
+    "-d", "0483:df11",
+    "-a", "0",
+    "-s", "0x08000000:leave",
+    "-D", "target/thumbv7em-none-eabihf/release/stm32f4.bin"
+]
+dependencies = ["objcopy"]
+
+# use openocd to flash the binary
+[tasks.flash]
+command = "openocd"
+args = [
+    "-f", "openocd.cfg",
+    "-c", "program target/thumbv7em-none-eabihf/release/stm32f4 reset"
+]

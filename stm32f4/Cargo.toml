@@ -1,0 +1,22 @@
+[package]
+name = "stm32f4"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+cortex-m = "0.7.7"
+cortex-m-rt = "0.7.3"
+# stm32f4xx-hal = { version = "0.16.0", features = ["rt", "stm32f405", "usb_fs"] }
+stm32f4xx-hal = { path = "../../stm32f4xx-hal", features = ["rt", "stm32f405", "usb_fs"] }
+usb-device = "0.2.9"
+usbd-serial = "0.1.1"
+log = { version = "0.4.19", default_features=false }
+critical-section = { version = "1.1.1", default_features=false }
+panic-persist = "0.3.0"
+
+pn532 = { path = "../../pn532" }
+
+[profile.release]
+codegen-units = 1
+debug = true
+lto = true
