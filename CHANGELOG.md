@@ -2,24 +2,12 @@
 
 ## [Unreleased]
 
-### Added
-
-### Changed
-
-### Fixed
-
 ## [0.3.1]
 
-### Added
-
-### Changed
-
 ### Fixed
-- tell the async excecutor to poll until `wait_ready` returns `Ready` #12
+- tell the async executor to poll until `wait_ready` returns `Ready` #12
 
 ## [0.3.0]
-
-### Added
 
 ### Changed
 
@@ -36,7 +24,3 @@
 
 ### Added
 - Removed now stabilized nightly features
-
-### Changed
-
-### Fixed

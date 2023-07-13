@@ -197,7 +197,7 @@ pub enum ErrorCode {
     NadMissing = 0x2E,
 }
 
-impl core::convert::TryFrom<u8> for ErrorCode {
+impl TryFrom<u8> for ErrorCode {
     type Error = ();
 
     fn try_from(value: u8) -> Result<ErrorCode, ()> {
