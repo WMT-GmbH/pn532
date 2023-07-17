@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Fixed
+- fix `I2CInterface` (without Irq pin) `InterfaceError` #14
+
 ## [0.3.1]
 
 ### Fixed

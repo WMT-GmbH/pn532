@@ -16,6 +16,10 @@ pub const PN532_I2C_READY: u8 = 0x01;
 pub const I2C_ADDRESS: u8 = 0x24;
 
 /// I2C Interface without IRQ pin
+///
+/// # Note:
+/// Currently the implementation of [`I2CInterface::wait_ready`] ignores any I2C errors.
+/// See this [issue](https://github.com/WMT-GmbH/pn532/issues/4) for an explanation.
 #[derive(Clone, Debug)]
 pub struct I2CInterface<I2C>
 where
@@ -42,7 +46,10 @@ where
 
     fn wait_ready(&mut self) -> Poll<Result<(), Self::Error>> {
         let mut buf = [0];
-        self.i2c.read(I2C_ADDRESS, &mut buf)?;
+        self.i2c.read(I2C_ADDRESS, &mut buf).ok();
+        // It's possible that the PN532 does not ACK the read request when it is not ready.
+        // Since we don't know the concrete type of `Self::Error` unfortunately we have to ignore all interface errors here.
+        // See https://github.com/WMT-GmbH/pn532/issues/4 for more info
 
         if buf[0] == PN532_I2C_READY {
             Poll::Ready(Ok(()))

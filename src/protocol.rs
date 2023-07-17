@@ -402,7 +402,7 @@ impl<'a, I: Interface> Future for WaitReadyFuture<'a, I> {
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let poll = self.interface.wait_ready();
         if poll.is_pending() {
-            // tell the excecutor to poll this future again
+            // tell the executor to poll this future again
             cx.waker().clone().wake();
         }
         poll
