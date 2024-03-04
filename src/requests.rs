@@ -96,72 +96,155 @@ impl Request<0> {
 }
 
 /// Commands supported by the Pn532
+///
+/// These commands are fully described in the section 7 of the User Manual:
+/// <https://www.nxp.com/docs/en/user-guide/141520.pdf>
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
 #[repr(u8)]
 pub enum Command {
-    /// See 7.2.1 Diagnose
+    /// This command is used for self-diagnosis. Processing time of this command varies depending
+    /// on the content of the processing.
+    ///
+    /// For more information, see 7.2.1 Diagnose
     Diagnose = 0x00,
-    /// See 7.2.2 GetFirmwareVersion
+    /// This command is used to get the version of the embedded firmware from PN532.
+    ///
+    /// For more information, see 7.2.2 GetFirmwareVersion
     GetFirmwareVersion = 0x02,
-    /// See 7.2.3 GetGeneralStatus
+    /// This command allows the host controller to know at a given moment the complete situation of
+    /// the PN532.
+    ///
+    /// For more information, see 7.2.3 GetGeneralStatus
     GetGeneralStatus = 0x04,
-    /// See 7.2.4 ReadRegister
+    /// This command is used to read the content of one or several internal registers of the PN532.
+    ///
+    /// For more information, see 7.2.4 ReadRegister
     ReadRegister = 0x06,
-    /// See 7.2.5 WriteRegister
+    /// This command is used to overwrite the content of one or several internal registers of the
+    /// PN532.
+    ///
+    /// For more information, see 7.2.5 WriteRegister
     WriteRegister = 0x08,
-    /// See 7.2.6 ReadGPIO
+    /// Tells the PN532 to read the value for each GPIO port and return the information to the host
+    /// controller.
+    ///
+    /// For more information, see 7.2.6 ReadGPIO
     ReadGPIO = 0x0C,
-    /// See 7.2.7 WriteGPIO
+    /// Tells the PN532 to apply the value for each port specified by the host controller.
+    ///
+    /// For more information, see 7.2.7 WriteGPIO
     WriteGPIO = 0x0E,
-    /// See 7.2.8 SetSerialBaudRate
+    /// Selects the baud rate on the serial link between the host controller and the PN532.
+    ///
+    /// For more information, see 7.2.8 SetSerialBaudRate
     SetSerialBaudRate = 0x10,
-    /// See 7.2.9 SetParameters
+    /// This command is used to set internal parameters of the PN532, and then to configure its
+    /// behavior regarding different cases.
+    ///
+    /// For more information, see 7.2.9 SetParameters
     SetParameters = 0x12,
-    /// See 7.2.10 SAMConfiguration
+    /// This command is used to select the data flow path by configuring the internal serial data
+    /// switch.
+    ///
+    /// For more information, see 7.2.10 SAMConfiguration
     SAMConfiguration = 0x14,
-    /// See 7.2.11 PowerDown
+    /// This command can be used to put the PN532 into Power Down mode in order to save power
+    /// consumption.
+    ///
+    /// For more information, see 7.2.11 PowerDown
     PowerDown = 0x16,
-    /// See 7.3.1 RFConfiguration
+    /// This command is used to configure the different settings of the PN532.
+    ///
+    /// For more information, see 7.3.1 RFConfiguration
     RFConfiguration = 0x32,
-    /// See 7.3.2 RFRegulationTest
+    /// This command is used for radio regulation test.
+    ///
+    /// For more information, see 7.3.2 RFRegulationTest
     RFRegulationTest = 0x58,
-    /// See 7.3.3 InJumpForDEP
+    /// This command is used by a host controller to activate a target using either active or
+    /// passive communication mode during communication over DEP protocol.
+    ///
+    /// For more information, see 7.3.3 InJumpForDEP
     InJumpForDEP = 0x56,
-    /// See 7.3.4 InJumpForPSL
+    /// This command is used by a host controller to activate a target using either active or
+    /// passive communication mode during communication over PSL or DEP protocols.
+    ///
+    /// For more information, see 7.3.4 InJumpForPSL
     InJumpForPSL = 0x46,
-    /// See 7.3.5 InListPassiveTarget
+    /// This command tells PN532 to detect as many targets as possible in passive mode.
+    ///
+    /// For more information, see 7.3.5 InListPassiveTarget
     InListPassiveTarget = 0x4A,
-    /// See 7.3.6 InATR
+    /// This command is used by a host controller to launch an activation of a target in case of
+    /// passive mode.
+    ///
+    /// For more information, see 7.3.6 InATR
     InATR = 0x50,
-    /// See 7.3.7 InPSL
+    /// This command is used by a host controller to change the defined bit rates either with a TPE
+    /// target or with a ISO/IEC14443-4 target.
+    ///
+    /// For more information, see 7.3.7 InPSL
     InPSL = 0x4E,
-    /// See 7.3.8 InDataExchange
+    /// This command is used to support protocol data exchanges between the PN532 as initiator and
+    /// a target.
+    ///
+    /// For more information, see 7.3.8 InDataExchange
     InDataExchange = 0x40,
-    /// See 7.3.9 InCommunicateThru
+    /// This command is used to support basic data exchanges between the PN532 and a target.
+    ///
+    /// For more information, see 7.3.9 InCommunicateThru
     InCommunicateThru = 0x42,
-    /// See 7.3.10 InDeselect
+    /// Command to deselect specified targets(s).
+    ///
+    /// For more information, see 7.3.10 InDeselect
     InDeselect = 0x44,
-    /// See 7.3.11 InRelease
+    /// Command to release the specified target(s).
+    ///
+    /// For more information, see 7.3.11 InRelease
     InRelease = 0x52,
-    /// See 7.3.12 InSelect
+    /// Command to select the specified target.
+    ///
+    /// For more information, see 7.3.12 InSelect
     InSelect = 0x54,
-    /// See 7.3.13 InAutoPoll
+    /// This command is used to poll card(s) / target(s) of specified Type present in the RF field.
+    ///
+    /// For more information, see 7.3.13 InAutoPoll
     InAutoPoll = 0x60,
-    /// See 7.3.14 TgInitAsTarget
+    /// The host controller uses this command to configure the PN532 as target.
+    ///
+    /// For more information, see 7.3.14 TgInitAsTarget
     TgInitAsTarget = 0x8C,
-    /// See 7.3.15 TgSetGeneralBytes
+    /// This command is used to give General Bytes to the PN532.
+    ///
+    /// For more information, see 7.3.15 TgSetGeneralBytes
     TgSetGeneralBytes = 0x92,
-    /// See 7.3.16 TgGetData
+    /// This command allows the host controller to get back the data received by the PN532 from its
+    /// initiator.
+    ///
+    /// For more information, see 7.3.16 TgGetData
     TgGetData = 0x86,
-    /// See 7.3.17 TgSetData
+    /// This command allows the host controller to spully PN532 with teh data that it wants to send
+    /// back to teh initiator.
+    ///
+    /// For more information, see 7.3.17 TgSetData
     TgSetData = 0x8E,
-    /// See 7.3.18 TgSetMetaData
+    /// This command is used if the overall amount of data to be sent cannot be transmitted in one
+    /// frame.
+    ///
+    /// For more information, see 7.3.18 TgSetMetaData
     TgSetMetaData = 0x94,
-    /// See 7.3.19 TgGetInitiatorCommand
+    /// This command is used to get a packet of data from an initiator and to send it back to the
+    /// host controller.
+    ///
+    /// For more information, see 7.3.19 TgGetInitiatorCommand
     TgGetInitiatorCommand = 0x88,
-    /// See 7.3.20 TgResponseToInitiator
+    /// This command is used to send a response packet of data to an initiator.
+    ///
+    /// For more information, see 7.3.20 TgResponseToInitiator
     TgResponseToInitiator = 0x90,
-    /// See 7.3.21 TgGetTargetStatus
+    /// This command is used by the host controller to know what the current state of the PN532 is.
+    ///
+    /// For more information, see 7.3.21 TgGetTargetStatus
     TgGetTargetStatus = 0x8A,
 }
 
