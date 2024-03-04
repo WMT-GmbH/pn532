@@ -1,12 +1,16 @@
-use core::fmt::Debug;
-use core::future::Future;
-use core::pin::Pin;
-use core::task::{Context, Poll};
+use core::{
+    fmt::Debug,
+    future::Future,
+    pin::Pin,
+    task::{Context, Poll},
+};
 
 use embedded_hal::timer::CountDown;
 
-use crate::requests::{BorrowedRequest, Command};
-use crate::{Interface, Request};
+use crate::{
+    requests::{BorrowedRequest, Command},
+    Interface, Request,
+};
 
 const PREAMBLE: [u8; 3] = [0x00, 0x00, 0xFF];
 const POSTAMBLE: u8 = 0x00;
@@ -403,7 +407,7 @@ impl<'a, I: Interface> Future for WaitReadyFuture<'a, I> {
         let poll = self.interface.wait_ready();
         if poll.is_pending() {
             // tell the executor to poll this future again
-            cx.waker().clone().wake();
+            cx.waker().wake_by_ref();
         }
         poll
     }
