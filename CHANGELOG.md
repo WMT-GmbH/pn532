@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+## [0.3.3]
+
+### Added
+- Descriptions for the variants of `requests::Command` #16
+
 ## [0.3.2]
 
 ### Fixed
