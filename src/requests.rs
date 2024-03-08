@@ -7,13 +7,23 @@ pub struct Request<const N: usize> {
     pub data: [u8; N],
 }
 
-pub(crate) struct BorrowedRequest<'a> {
+pub struct BorrowedRequest<'a> {
     pub command: Command,
     pub data: &'a [u8],
 }
 
-impl<const N: usize> Request<N> {
-    pub(crate) fn borrow(&self) -> BorrowedRequest<'_> {
+impl<'a> BorrowedRequest<'a> {
+    pub fn new(command: Command, data: &'a [u8]) -> Self {
+        Self {command, data}
+    }
+}
+
+pub trait BorrowRequest {
+    fn borrow(&self) -> BorrowedRequest<'_>;
+}
+
+impl<const N: usize> BorrowRequest for Request<N> {
+    fn borrow(&self) -> BorrowedRequest<'_> {
         BorrowedRequest {
             command: self.command,
             data: &self.data,

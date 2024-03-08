@@ -8,7 +8,7 @@ use core::{
 use embedded_hal::timer::CountDown;
 
 use crate::{
-    requests::{BorrowedRequest, Command},
+    requests::{BorrowRequest, BorrowedRequest, Command},
     Interface, Request,
 };
 
@@ -175,7 +175,7 @@ impl<I: Interface, T, const N: usize> Pn532<I, T, N> {
     /// pn532.send(&Request::GET_FIRMWARE_VERSION);
     /// ```
     #[inline]
-    pub fn send<const M: usize>(&mut self, request: &Request<M>) -> Result<(), Error<I::Error>> {
+    pub fn send(&mut self, request: &impl BorrowRequest) -> Result<(), Error<I::Error>> {
         // codegen trampoline: https://github.com/rust-lang/rust/issues/77960
         self._send(request.borrow())
     }
