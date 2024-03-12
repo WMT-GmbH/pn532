@@ -7,17 +7,22 @@ pub struct Request<const N: usize> {
     pub data: [u8; N],
 }
 
-pub(crate) struct BorrowedRequest<'a> {
+/// Pn532 Request consisting of a [`Command`] and a reference to extra command data
+pub struct BorrowedRequest<'a> {
     pub command: Command,
     pub data: &'a [u8],
 }
 
-impl<const N: usize> Request<N> {
-    pub(crate) fn borrow(&self) -> BorrowedRequest<'_> {
-        BorrowedRequest {
-            command: self.command,
-            data: &self.data,
-        }
+impl<'a> BorrowedRequest<'a> {
+    #[inline]
+    pub const fn new(command: Command, data: &'a [u8]) -> Self {
+        Self {command, data}
+    }
+}
+
+impl<'a, const N: usize> Into<BorrowedRequest<'a>> for &'a Request<N> {
+    fn into(self) -> BorrowedRequest<'a> {
+        BorrowedRequest::new(self.command, &self.data)
     }
 }
 
