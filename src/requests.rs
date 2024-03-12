@@ -18,12 +18,12 @@ impl<'a> BorrowedRequest<'a> {
     }
 }
 
-pub trait BorrowRequest {
-    fn borrow(&self) -> BorrowedRequest<'_>;
+pub trait BorrowRequest<'a> {
+    fn borrow(self) -> BorrowedRequest<'a>;
 }
 
-impl<const N: usize> BorrowRequest for Request<N> {
-    fn borrow(&self) -> BorrowedRequest<'_> {
+impl<'a, const N: usize> BorrowRequest<'a> for &'a Request<N> {
+    fn borrow(self) -> BorrowedRequest<'a> {
         BorrowedRequest {
             command: self.command,
             data: &self.data,
