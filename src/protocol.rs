@@ -8,7 +8,7 @@ use core::{
 use embedded_hal::timer::CountDown;
 
 use crate::{
-    requests::{BorrowRequest, BorrowedRequest, Command},
+    requests::{BorrowedRequest, Command},
     Interface,
 };
 
@@ -91,12 +91,12 @@ impl<I: Interface, T: CountDown, const N: usize> Pn532<I, T, N> {
     #[inline]
     pub fn process<'a>(
         &mut self,
-        request: impl BorrowRequest<'a>,
+        request: impl Into<BorrowedRequest<'a>>,
         response_len: usize,
         timeout: T::Time,
     ) -> Result<&[u8], Error<I::Error>> {
         // codegen trampoline: https://github.com/rust-lang/rust/issues/77960
-        self._process(request.borrow(), response_len, timeout)
+        self._process(request.into(), response_len, timeout)
     }
     fn _process(
         &mut self,
@@ -134,11 +134,11 @@ impl<I: Interface, T: CountDown, const N: usize> Pn532<I, T, N> {
     #[inline]
     pub fn process_no_response<'a>(
         &mut self,
-        request: impl BorrowRequest<'a>,
+        request: impl Into<BorrowedRequest<'a>>,
         timeout: T::Time,
     ) -> Result<(), Error<I::Error>> {
         // codegen trampoline: https://github.com/rust-lang/rust/issues/77960
-        self._process_no_response(request.borrow(), timeout)
+        self._process_no_response(request.into(), timeout)
     }
     fn _process_no_response(
         &mut self,
@@ -175,9 +175,9 @@ impl<I: Interface, T, const N: usize> Pn532<I, T, N> {
     /// pn532.send(&Request::GET_FIRMWARE_VERSION);
     /// ```
     #[inline]
-    pub fn send<'a>(&mut self, request: impl BorrowRequest<'a>) -> Result<(), Error<I::Error>> {
+    pub fn send<'a>(&mut self, request: impl Into<BorrowedRequest<'a>>) -> Result<(), Error<I::Error>> {
         // codegen trampoline: https://github.com/rust-lang/rust/issues/77960
-        self._send(request.borrow())
+        self._send(request.into())
     }
     fn _send(&mut self, request: BorrowedRequest<'_>) -> Result<(), Error<I::Error>> {
         let data_len = request.data.len();
@@ -302,11 +302,11 @@ impl<I: Interface, const N: usize> Pn532<I, (), N> {
     #[inline]
     pub async fn process_async<'a>(
         &mut self,
-        request: impl BorrowRequest<'a>,
+        request: impl Into<BorrowedRequest<'a>>,
         response_len: usize,
     ) -> Result<&[u8], Error<I::Error>> {
         // codegen trampoline: https://github.com/rust-lang/rust/issues/77960
-        self._process_async(request.borrow(), response_len).await
+        self._process_async(request.into(), response_len).await
     }
     async fn _process_async(
         &mut self,
@@ -332,10 +332,10 @@ impl<I: Interface, const N: usize> Pn532<I, (), N> {
     #[inline]
     pub async fn process_no_response_async<'a>(
         &mut self,
-        request: impl BorrowRequest<'a>,
+        request: impl Into<BorrowedRequest<'a>>,
     ) -> Result<(), Error<I::Error>> {
         // codegen trampoline: https://github.com/rust-lang/rust/issues/77960
-        self._process_no_response_async(request.borrow()).await
+        self._process_no_response_async(request.into()).await
     }
     async fn _process_no_response_async(
         &mut self,
