@@ -7,6 +7,7 @@ pub struct Request<const N: usize> {
     pub data: [u8; N],
 }
 
+/// Pn532 Request consisting of a [`Command`] and a reference to extra command data
 pub struct BorrowedRequest<'a> {
     pub command: Command,
     pub data: &'a [u8],
