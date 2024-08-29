@@ -10,7 +10,7 @@ use core::fmt::Debug;
 use core::task::Poll;
 
 use embedded_hal::spi::SpiDevice;
-use embedded_hal::digital::{InputPin, OutputPin};
+use embedded_hal::digital::InputPin;
 
 use crate::Interface;
 
