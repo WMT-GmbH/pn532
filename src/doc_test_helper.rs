@@ -2,51 +2,33 @@ use core::convert::Infallible;
 use core::time::Duration;
 
 use embedded_hal::spi::{SpiDevice, Operation};
-use embedded_hal::digital::OutputPin;
 use crate::CountDown;
 
 use crate::spi::SPIInterface;
 use crate::Pn532;
 
 /// used for doc tests
-pub fn get_pn532() -> Pn532<SPIInterface<NoOpSPI, NoOpCS>, NoOpTimer> {
+pub fn get_pn532() -> Pn532<SPIInterface<NoOpSPI>, NoOpTimer> {
     Pn532::new(
         SPIInterface {
             spi: NoOpSPI,
-            cs: NoOpCS,
         },
         NoOpTimer,
     )
 }
 
 /// used for doc tests
-pub fn get_async_pn532() -> Pn532<SPIInterface<NoOpSPI, NoOpCS>, ()> {
+pub fn get_async_pn532() -> Pn532<SPIInterface<NoOpSPI>, ()> {
     Pn532::new(
         SPIInterface {
             spi: NoOpSPI,
-            cs: NoOpCS,
         },
         (),
     )
 }
 
-pub struct NoOpCS;
 pub struct NoOpSPI;
 pub struct NoOpTimer;
-
-impl OutputPin for NoOpCS {
-    fn set_low(&mut self) -> Result<(), Self::Error> {
-        Ok(())
-    }
-
-    fn set_high(&mut self) -> Result<(), Self::Error> {
-        Ok(())
-    }
-}
-
-impl embedded_hal::digital::ErrorType for NoOpCS {
-    type Error = Infallible;
-}
 
 impl SpiDevice for NoOpSPI
 {

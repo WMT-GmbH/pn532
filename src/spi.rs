@@ -34,24 +34,20 @@ pub const PN532_SPI_READY: u8 = as_lsb(0x01);
 
 /// SPI Interface without IRQ pin
 #[derive(Clone, Debug)]
-pub struct SPIInterface<SPI, CS>
+pub struct SPIInterface<SPI>
 where
     SPI: SpiDevice,
-    CS: OutputPin<Error = Infallible>,
 {
     pub spi: SPI,
-    pub cs: CS,
 }
 
-impl<SPI, CS> Interface for SPIInterface<SPI, CS>
+impl<SPI> Interface for SPIInterface<SPI>
 where
     SPI: SpiDevice,
-    CS: OutputPin<Error = Infallible>,
 {
     type Error = <SPI as embedded_hal::spi::ErrorType>::Error;
 
     fn write(&mut self, frame: &[u8]) -> Result<(), Self::Error> {
-        self.cs.set_low().ok();
         self.spi.write(&[PN532_SPI_DATAWRITE])?;
 
         #[cfg(feature = "msb-spi")]
@@ -61,17 +57,14 @@ where
         #[cfg(not(feature = "msb-spi"))]
         self.spi.write(frame)?;
 
-        self.cs.set_high().ok();
         Ok(())
     }
 
     fn wait_ready(&mut self) -> Poll<Result<(), Self::Error>> {
         let mut buf = [0x00];
 
-        self.cs.set_low().ok();
         self.spi.write(&[PN532_SPI_STATREAD])?;
         self.spi.transfer_in_place(&mut buf)?;
-        self.cs.set_high().ok();
 
         if buf[0] == PN532_SPI_READY {
             Poll::Ready(Ok(()))
@@ -81,10 +74,8 @@ where
     }
 
     fn read(&mut self, buf: &mut [u8]) -> Result<(), Self::Error> {
-        self.cs.set_low().ok();
         self.spi.write(&[PN532_SPI_DATAREAD])?;
         self.spi.transfer_in_place(buf)?;
-        self.cs.set_high().ok();
 
         #[cfg(feature = "msb-spi")]
         for byte in buf.iter_mut() {
@@ -96,27 +87,23 @@ where
 
 /// SPI Interface with IRQ pin
 #[derive(Clone, Debug)]
-pub struct SPIInterfaceWithIrq<SPI, CS, IRQ>
+pub struct SPIInterfaceWithIrq<SPI, IRQ>
 where
     SPI: SpiDevice,
-    CS: OutputPin<Error = Infallible>,
     IRQ: InputPin<Error = Infallible>,
 {
     pub spi: SPI,
-    pub cs: CS,
     pub irq: IRQ,
 }
 
-impl<SPI, CS, IRQ> Interface for SPIInterfaceWithIrq<SPI, CS, IRQ>
+impl<SPI, IRQ> Interface for SPIInterfaceWithIrq<SPI, IRQ>
 where
     SPI: SpiDevice,
-    CS: OutputPin<Error = Infallible>,
     IRQ: InputPin<Error = Infallible>,
 {
     type Error = <SPI as embedded_hal::spi::ErrorType>::Error;
 
     fn write(&mut self, frame: &[u8]) -> Result<(), Self::Error> {
-        self.cs.set_low().ok();
         self.spi.write(&[PN532_SPI_DATAWRITE])?;
 
         #[cfg(feature = "msb-spi")]
@@ -126,7 +113,6 @@ where
         #[cfg(not(feature = "msb-spi"))]
         self.spi.write(frame)?;
 
-        self.cs.set_high().ok();
         Ok(())
     }
 
@@ -140,10 +126,8 @@ where
     }
 
     fn read(&mut self, buf: &mut [u8]) -> Result<(), Self::Error> {
-        self.cs.set_low().ok();
         self.spi.write(&[PN532_SPI_DATAREAD])?;
         self.spi.transfer_in_place(buf)?;
-        self.cs.set_high().ok();
 
         #[cfg(feature = "msb-spi")]
         for byte in buf.iter_mut() {
