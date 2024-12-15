@@ -65,7 +65,7 @@ impl<E: Debug> From<E> for Error<E> {
 /// * `N` is the const generic type parameter of this struct.
 /// * `response_len` is the largest number passed to
 /// [`receive_response`](Pn532::receive_response), [`process`](Pn532::process) or [`process_async`](Pn532::process_async)
-/// * `M` is the largest const generic type parameter of [`Request`] references passed to any sending methods of this struct
+/// * `M` is the largest const generic type parameter of [`Request`](crate::requests::Request) references passed to any sending methods of this struct
 #[derive(Clone, Debug)]
 pub struct Pn532<I, T, const N: usize = 32> {
     pub interface: I,
