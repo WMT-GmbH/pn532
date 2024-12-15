@@ -74,7 +74,11 @@ pub trait Interface {
     /// Error specific to the serial link.
     type Error: Debug;
     /// Writes a `frame` to the Pn532
-    fn write(&mut self, frame: &[u8]) -> Result<(), Self::Error>;
+    ///
+    /// # Note
+    /// `frame` is passed as mutable reference to allow the SPI driver to reverse the bit order
+    /// when the `msb-spi` feature is enabled.
+    fn write(&mut self, frame: &mut [u8]) -> Result<(), Self::Error>;
     /// Checks if the Pn532 has data to be read.
     /// Uses either the serial link or the IRQ pin.
     fn wait_ready(&mut self) -> Poll<Result<(), Self::Error>>;
@@ -86,7 +90,7 @@ pub trait Interface {
 impl<I: Interface> Interface for &mut I {
     type Error = I::Error;
 
-    fn write(&mut self, frame: &[u8]) -> Result<(), Self::Error> {
+    fn write(&mut self, frame: &mut [u8]) -> Result<(), Self::Error> {
         I::write(self, frame)
     }
 

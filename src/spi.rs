@@ -9,8 +9,8 @@ use core::convert::Infallible;
 use core::fmt::Debug;
 use core::task::Poll;
 
-use embedded_hal::spi::SpiDevice;
 use embedded_hal::digital::InputPin;
+use embedded_hal::spi::{Operation, SpiDevice};
 
 use crate::Interface;
 
@@ -47,26 +47,23 @@ where
 {
     type Error = <SPI as embedded_hal::spi::ErrorType>::Error;
 
-    fn write(&mut self, frame: &[u8]) -> Result<(), Self::Error> {
-        self.spi.write(&[PN532_SPI_DATAWRITE])?;
-
+    fn write(&mut self, frame: &mut [u8]) -> Result<(), Self::Error> {
         #[cfg(feature = "msb-spi")]
-        for byte in frame {
-            self.spi.write(&[byte.reverse_bits()])?
+        for byte in frame.iter_mut() {
+            *byte = byte.reverse_bits();
         }
-        #[cfg(not(feature = "msb-spi"))]
-        self.spi.write(frame)?;
-
-        Ok(())
+        self.spi.transaction(&mut [
+            Operation::Write(&[PN532_SPI_DATAWRITE]),
+            Operation::Write(frame),
+        ])
     }
 
     fn wait_ready(&mut self) -> Poll<Result<(), Self::Error>> {
-        let mut buf = [0x00];
+        let mut buf = [PN532_SPI_STATREAD, 0x00];
 
-        self.spi.write(&[PN532_SPI_STATREAD])?;
         self.spi.transfer_in_place(&mut buf)?;
 
-        if buf[0] == PN532_SPI_READY {
+        if buf[1] == PN532_SPI_READY {
             Poll::Ready(Ok(()))
         } else {
             Poll::Pending
@@ -74,8 +71,10 @@ where
     }
 
     fn read(&mut self, buf: &mut [u8]) -> Result<(), Self::Error> {
-        self.spi.write(&[PN532_SPI_DATAREAD])?;
-        self.spi.transfer_in_place(buf)?;
+        self.spi.transaction(&mut [
+            Operation::Write(&[PN532_SPI_DATAREAD]),
+            Operation::Read(buf),
+        ])?;
 
         #[cfg(feature = "msb-spi")]
         for byte in buf.iter_mut() {
@@ -103,17 +102,15 @@ where
 {
     type Error = <SPI as embedded_hal::spi::ErrorType>::Error;
 
-    fn write(&mut self, frame: &[u8]) -> Result<(), Self::Error> {
-        self.spi.write(&[PN532_SPI_DATAWRITE])?;
-
+    fn write(&mut self, frame: &mut [u8]) -> Result<(), Self::Error> {
         #[cfg(feature = "msb-spi")]
-        for byte in frame {
-            self.spi.write(&[byte.reverse_bits()])?
+        for byte in frame.iter_mut() {
+            *byte = byte.reverse_bits();
         }
-        #[cfg(not(feature = "msb-spi"))]
-        self.spi.write(frame)?;
-
-        Ok(())
+        self.spi.transaction(&mut [
+            Operation::Write(&[PN532_SPI_DATAWRITE]),
+            Operation::Write(frame),
+        ])
     }
 
     fn wait_ready(&mut self) -> Poll<Result<(), Self::Error>> {
@@ -126,8 +123,10 @@ where
     }
 
     fn read(&mut self, buf: &mut [u8]) -> Result<(), Self::Error> {
-        self.spi.write(&[PN532_SPI_DATAREAD])?;
-        self.spi.transfer_in_place(buf)?;
+        self.spi.transaction(&mut [
+            Operation::Write(&[PN532_SPI_DATAREAD]),
+            Operation::Read(buf),
+        ])?;
 
         #[cfg(feature = "msb-spi")]
         for byte in buf.iter_mut() {

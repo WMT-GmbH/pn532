@@ -230,7 +230,7 @@ impl<I: Interface, T, const N: usize> Pn532<I, T, N> {
         self.buf[7 + data_len] = to_checksum(data_sum);
         self.buf[8 + data_len] = POSTAMBLE;
 
-        self.interface.write(&self.buf[..9 + data_len])?;
+        self.interface.write(&mut self.buf[..9 + data_len])?;
         Ok(())
     }
 
@@ -298,7 +298,8 @@ impl<I: Interface, T, const N: usize> Pn532<I, T, N> {
     /// to the host controller.
     /// Then, the PN532 starts again waiting for a new command.
     pub fn abort(&mut self) -> Result<(), Error<I::Error>> {
-        self.interface.write(&ACK)?;
+        #[allow(const_item_mutation)]
+        self.interface.write(&mut ACK)?;
         Ok(())
     }
 }

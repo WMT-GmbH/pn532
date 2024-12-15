@@ -17,7 +17,7 @@ pub struct SerialPortInterface {
 impl Interface for SerialPortInterface {
     type Error = std::io::Error;
 
-    fn write(&mut self, frame: &[u8]) -> Result<(), Self::Error> {
+    fn write(&mut self, frame: &mut [u8]) -> Result<(), Self::Error> {
         self.port.write_all(frame)
     }
 

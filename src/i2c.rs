@@ -32,7 +32,7 @@ where
 {
     type Error = I2C::Error;
 
-    fn write(&mut self, frame: &[u8]) -> Result<(), Self::Error> {
+    fn write(&mut self, frame: &mut [u8]) -> Result<(), Self::Error> {
         self.i2c.write(I2C_ADDRESS, frame)
     }
 
@@ -76,7 +76,7 @@ where
 {
     type Error = <I2C as embedded_hal::i2c::ErrorType>::Error;
 
-    fn write(&mut self, frame: &[u8]) -> Result<(), Self::Error> {
+    fn write(&mut self, frame: &mut [u8]) -> Result<(), Self::Error> {
         self.i2c.write(I2C_ADDRESS, frame)
     }
 
