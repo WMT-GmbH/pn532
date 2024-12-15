@@ -19,7 +19,6 @@ keywords = [
 [dependencies]
 embedded-hal = { version = "1.0.0" }
 nb = "1.0.0"
-void = { version = "1.0.2", default-features = false }
 serialport = { version = "4.0.1", optional = true }
 
 [features]

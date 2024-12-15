@@ -1,5 +1,6 @@
 //! SerialPort interface
 
+use core::convert::Infallible;
 use core::task::Poll;
 use std::io::Write;
 use std::time::{Duration, Instant};
@@ -68,7 +69,7 @@ impl Default for SysTimer {
 
 impl CountDown for SysTimer {
     type Time = Duration;
-    type Error = nb::Error<void::Void>;
+    type Error = nb::Error<Infallible>;
 
     fn start<T>(&mut self, count: T)
     where
@@ -78,7 +79,7 @@ impl CountDown for SysTimer {
         self.duration = count.into();
     }
 
-    fn wait(&mut self) -> nb::Result<(), void::Void> {
+    fn wait(&mut self) -> nb::Result<(), Infallible> {
         if (Instant::now() - self.start) >= self.duration {
             Ok(())
         } else {
