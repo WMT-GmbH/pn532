@@ -32,7 +32,6 @@ impl embedded_hal::spi::ErrorType for NoOpSPI {
 
 impl CountDown for NoOpTimer {
     type Time = Duration;
-    type Error = nb::Error<Infallible>;
 
     fn start<T>(&mut self, _: T)
     where

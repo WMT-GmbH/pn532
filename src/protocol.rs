@@ -1,13 +1,13 @@
+use crate::{
+    requests::{BorrowedRequest, Command},
+    Interface,
+};
 use core::{
+    convert::Infallible,
     fmt::Debug,
     future::Future,
     pin::Pin,
     task::{Context, Poll},
-};
-
-use crate::{
-    requests::{BorrowedRequest, Command},
-    Interface,
 };
 
 const PREAMBLE: [u8; 3] = [0x00, 0x00, 0xFF];
@@ -83,8 +83,6 @@ pub struct Pn532<I, T, const N: usize = 32> {
 /// *Note* that the implementer doesn't necessarily have to be a *downcounting* timer; it could also
 /// be an *upcounting* timer as long as the above contract is upheld.
 pub trait CountDown {
-    /// Error type
-    type Error;
     /// The unit of time used by this timer
     type Time;
 
@@ -94,7 +92,7 @@ pub trait CountDown {
         T: Into<Self::Time>;
 
     /// Non-blockingly "waits" until the count-down finishes
-    fn wait(&mut self) -> Result<(), Self::Error>;
+    fn wait(&mut self) -> nb::Result<(), Infallible>;
 }
 
 impl<I: Interface, T: CountDown, const N: usize> Pn532<I, T, N> {

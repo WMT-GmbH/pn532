@@ -69,7 +69,6 @@ impl Default for SysTimer {
 
 impl CountDown for SysTimer {
     type Time = Duration;
-    type Error = nb::Error<Infallible>;
 
     fn start<T>(&mut self, count: T)
     where
