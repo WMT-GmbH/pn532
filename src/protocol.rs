@@ -191,7 +191,10 @@ impl<I: Interface, T, const N: usize> Pn532<I, T, N> {
     /// pn532.send(&Request::GET_FIRMWARE_VERSION);
     /// ```
     #[inline]
-    pub fn send<'a>(&mut self, request: impl Into<BorrowedRequest<'a>>) -> Result<(), Error<I::Error>> {
+    pub fn send<'a>(
+        &mut self,
+        request: impl Into<BorrowedRequest<'a>>,
+    ) -> Result<(), Error<I::Error>> {
         // codegen trampoline: https://github.com/rust-lang/rust/issues/77960
         self._send(request.into())
     }
