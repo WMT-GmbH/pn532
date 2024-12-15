@@ -73,21 +73,27 @@ pub struct Pn532<I, T, const N: usize = 32> {
     buf: [u8; N],
 }
 
-// pub trait CountDown {
-//     type Time;
-//     type Error;
-//     fn start(time: Self::Time);
-//     fn wait() -> Result<(), Self::Error>;
-//
+/// A count-down timer
+///
+/// # Contract
+///
+/// - `self.start(count); block!(self.wait());` MUST block for AT LEAST the time specified by
+/// `count`.
+///
+/// *Note* that the implementer doesn't necessarily have to be a *downcounting* timer; it could also
+/// be an *upcounting* timer as long as the above contract is upheld.
 pub trait CountDown {
+    /// Error type
     type Error;
+    /// The unit of time used by this timer
     type Time;
 
-    /// Starts a new count down
+    /// Starts a new count-down
     fn start<T>(&mut self, count: T)
     where
         T: Into<Self::Time>;
 
+    /// Non-blockingly "waits" until the count-down finishes
     fn wait(&mut self) -> Result<(), Self::Error>;
 }
 
