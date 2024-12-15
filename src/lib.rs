@@ -57,7 +57,7 @@ use core::fmt::Debug;
 use core::task::Poll;
 use core::time::Duration;
 
-pub use crate::protocol::{Error, Pn532};
+pub use crate::protocol::{Error, Pn532, CountDown};
 pub use crate::requests::Request;
 
 pub mod i2c;

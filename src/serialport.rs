@@ -4,7 +4,7 @@ use core::task::Poll;
 use std::io::Write;
 use std::time::{Duration, Instant};
 
-use embedded_hal::timer::CountDown;
+use crate::protocol::CountDown;
 use serialport::SerialPort;
 
 use crate::Interface;
@@ -68,6 +68,7 @@ impl Default for SysTimer {
 
 impl CountDown for SysTimer {
     type Time = Duration;
+    type Error = nb::Error<void::Void>;
 
     fn start<T>(&mut self, count: T)
     where

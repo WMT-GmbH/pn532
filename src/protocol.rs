@@ -5,8 +5,6 @@ use core::{
     task::{Context, Poll},
 };
 
-use embedded_hal::timer::CountDown;
-
 use crate::{
     requests::{BorrowedRequest, Command},
     Interface,
@@ -73,6 +71,24 @@ pub struct Pn532<I, T, const N: usize = 32> {
     pub interface: I,
     pub timer: T,
     buf: [u8; N],
+}
+
+// pub trait CountDown {
+//     type Time;
+//     type Error;
+//     fn start(time: Self::Time);
+//     fn wait() -> Result<(), Self::Error>;
+//
+pub trait CountDown {
+    type Error;
+    type Time;
+
+    /// Starts a new count down
+    fn start<T>(&mut self, count: T)
+    where
+        T: Into<Self::Time>;
+
+    fn wait(&mut self) -> Result<(), Self::Error>;
 }
 
 impl<I: Interface, T: CountDown, const N: usize> Pn532<I, T, N> {
