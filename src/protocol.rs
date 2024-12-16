@@ -1,13 +1,13 @@
+use crate::{
+    requests::{BorrowedRequest, Command},
+    Interface,
+};
 use core::{
+    convert::Infallible,
     fmt::Debug,
     future::Future,
     pin::Pin,
     task::{Context, Poll},
-};
-
-use crate::{
-    requests::{BorrowedRequest, Command},
-    Interface,
 };
 
 const PREAMBLE: [u8; 3] = [0x00, 0x00, 0xFF];
@@ -65,7 +65,7 @@ impl<E: Debug> From<E> for Error<E> {
 /// * `N` is the const generic type parameter of this struct.
 /// * `response_len` is the largest number passed to
 /// [`receive_response`](Pn532::receive_response), [`process`](Pn532::process) or [`process_async`](Pn532::process_async)
-/// * `M` is the largest const generic type parameter of [`Request`] references passed to any sending methods of this struct
+/// * `M` is the largest const generic type parameter of [`Request`](crate::requests::Request) references passed to any sending methods of this struct
 #[derive(Clone, Debug)]
 pub struct Pn532<I, T, const N: usize = 32> {
     pub interface: I,
@@ -73,22 +73,26 @@ pub struct Pn532<I, T, const N: usize = 32> {
     buf: [u8; N],
 }
 
-// pub trait CountDown {
-//     type Time;
-//     type Error;
-//     fn start(time: Self::Time);
-//     fn wait() -> Result<(), Self::Error>;
-//
+/// A count-down timer
+///
+/// # Contract
+///
+/// - `self.start(count); block!(self.wait());` MUST block for AT LEAST the time specified by
+/// `count`.
+///
+/// *Note* that the implementer doesn't necessarily have to be a *downcounting* timer; it could also
+/// be an *upcounting* timer as long as the above contract is upheld.
 pub trait CountDown {
-    type Error;
+    /// The unit of time used by this timer
     type Time;
 
-    /// Starts a new count down
+    /// Starts a new count-down
     fn start<T>(&mut self, count: T)
     where
         T: Into<Self::Time>;
 
-    fn wait(&mut self) -> Result<(), Self::Error>;
+    /// Non-blockingly "waits" until the count-down finishes
+    fn wait(&mut self) -> nb::Result<(), Infallible>;
 }
 
 impl<I: Interface, T: CountDown, const N: usize> Pn532<I, T, N> {
@@ -191,7 +195,10 @@ impl<I: Interface, T, const N: usize> Pn532<I, T, N> {
     /// pn532.send(&Request::GET_FIRMWARE_VERSION);
     /// ```
     #[inline]
-    pub fn send<'a>(&mut self, request: impl Into<BorrowedRequest<'a>>) -> Result<(), Error<I::Error>> {
+    pub fn send<'a>(
+        &mut self,
+        request: impl Into<BorrowedRequest<'a>>,
+    ) -> Result<(), Error<I::Error>> {
         // codegen trampoline: https://github.com/rust-lang/rust/issues/77960
         self._send(request.into())
     }
@@ -221,7 +228,7 @@ impl<I: Interface, T, const N: usize> Pn532<I, T, N> {
         self.buf[7 + data_len] = to_checksum(data_sum);
         self.buf[8 + data_len] = POSTAMBLE;
 
-        self.interface.write(&self.buf[..9 + data_len])?;
+        self.interface.write(&mut self.buf[..9 + data_len])?;
         Ok(())
     }
 
@@ -289,7 +296,8 @@ impl<I: Interface, T, const N: usize> Pn532<I, T, N> {
     /// to the host controller.
     /// Then, the PN532 starts again waiting for a new command.
     pub fn abort(&mut self) -> Result<(), Error<I::Error>> {
-        self.interface.write(&ACK)?;
+        #[allow(const_item_mutation)]
+        self.interface.write(&mut ACK)?;
         Ok(())
     }
 }

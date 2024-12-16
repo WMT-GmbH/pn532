@@ -1,5 +1,6 @@
 //! SerialPort interface
 
+use core::convert::Infallible;
 use core::task::Poll;
 use std::io::Write;
 use std::time::{Duration, Instant};
@@ -17,7 +18,7 @@ pub struct SerialPortInterface {
 impl Interface for SerialPortInterface {
     type Error = std::io::Error;
 
-    fn write(&mut self, frame: &[u8]) -> Result<(), Self::Error> {
+    fn write(&mut self, frame: &mut [u8]) -> Result<(), Self::Error> {
         self.port.write_all(frame)
     }
 
@@ -68,7 +69,6 @@ impl Default for SysTimer {
 
 impl CountDown for SysTimer {
     type Time = Duration;
-    type Error = nb::Error<void::Void>;
 
     fn start<T>(&mut self, count: T)
     where
@@ -78,7 +78,7 @@ impl CountDown for SysTimer {
         self.duration = count.into();
     }
 
-    fn wait(&mut self) -> nb::Result<(), void::Void> {
+    fn wait(&mut self) -> nb::Result<(), Infallible> {
         if (Instant::now() - self.start) >= self.duration {
             Ok(())
         } else {

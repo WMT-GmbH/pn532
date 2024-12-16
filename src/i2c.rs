@@ -3,9 +3,9 @@ use core::convert::Infallible;
 use core::fmt::Debug;
 use core::task::Poll;
 
-use embedded_hal::digital::InputPin;
-
 use crate::Interface;
+use embedded_hal::digital::InputPin;
+use embedded_hal::i2c::Operation;
 
 /// To be used in `Interface::wait_ready` implementations
 pub const PN532_I2C_READY: u8 = 0x01;
@@ -32,7 +32,7 @@ where
 {
     type Error = I2C::Error;
 
-    fn write(&mut self, frame: &[u8]) -> Result<(), Self::Error> {
+    fn write(&mut self, frame: &mut [u8]) -> Result<(), Self::Error> {
         self.i2c.write(I2C_ADDRESS, frame)
     }
 
@@ -51,11 +51,10 @@ where
     }
 
     fn read(&mut self, buf: &mut [u8]) -> Result<(), Self::Error> {
-        let mut local_buf = [0u8;32];
-        let local_buf_slice = &mut local_buf[..buf.len()+1]; // read one more than buf
-        self.i2c.read( I2C_ADDRESS, local_buf_slice)?;
-        buf.copy_from_slice(&local_buf_slice[1..]);
-        Ok(())
+        self.i2c.transaction(
+            I2C_ADDRESS,
+            &mut [Operation::Read(&mut [0]), Operation::Read(buf)],
+        )
     }
 }
 
@@ -77,7 +76,7 @@ where
 {
     type Error = <I2C as embedded_hal::i2c::ErrorType>::Error;
 
-    fn write(&mut self, frame: &[u8]) -> Result<(), Self::Error> {
+    fn write(&mut self, frame: &mut [u8]) -> Result<(), Self::Error> {
         self.i2c.write(I2C_ADDRESS, frame)
     }
 
@@ -91,6 +90,9 @@ where
     }
 
     fn read(&mut self, buf: &mut [u8]) -> Result<(), Self::Error> {
-        self.i2c.read( I2C_ADDRESS,buf)
+        self.i2c.transaction(
+            I2C_ADDRESS,
+            &mut [Operation::Read(&mut [0]), Operation::Read(buf)],
+        )
     }
 }

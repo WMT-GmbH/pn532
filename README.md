@@ -21,15 +21,12 @@ over these different links.
 ## SPI example
 ```rust
 use pn532::{requests::SAMMode, spi::SPIInterface, Pn532, Request};
-use pn532::spi::SPIInterface;
+use pn532::IntoDuration; // trait for `ms()`, your HAL might have its own
 
-// spi, cs and timer are structs implementing their respective embedded_hal traits.
+// spi is a struct implementing embedded_hal::spi::SpiDevice
+// timer is a struct implementing pn532::CountDown
 
-let interface = SPIInterface {
-    spi,
-    cs,
-};
-let mut pn532: Pn532<_, _, 32> = Pn532::new(interface, timer);
+let mut pn532: Pn532<_, _, 32> = Pn532::new(SPIInterface { spi }, timer);
 if let Err(e) = pn532.process(&Request::sam_configuration(SAMMode::Normal, false), 0, 50.ms()){
     println!("Could not initialize PN532: {e:?}")
 }

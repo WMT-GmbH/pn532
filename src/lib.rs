@@ -16,21 +16,17 @@
 //!
 //! # SPI example
 //! ```
-//! # use pn532::doc_test_helper::{NoOpSPI, NoOpCS, NoOpTimer};
+//! # use pn532::doc_test_helper::{NoOpSPI, NoOpTimer};
 //! use pn532::{requests::SAMMode, spi::SPIInterface, Pn532, Request};
 //! use pn532::IntoDuration; // trait for `ms()`, your HAL might have its own
 //!
 //! # let spi = NoOpSPI;
-//! # let cs = NoOpCS;
 //! # let timer = NoOpTimer;
 //! #
-//! // spi, cs and timer are structs implementing their respective embedded_hal traits.
+//! // spi is a struct implementing embedded_hal::spi::SpiDevice
+//! // timer is a struct implementing pn532::CountDown
 //!
-//! let interface = SPIInterface {
-//!     spi,
-//!     cs,
-//! };
-//! let mut pn532: Pn532<_, _, 32> = Pn532::new(interface, timer);
+//! let mut pn532: Pn532<_, _, 32> = Pn532::new(SPIInterface { spi }, timer);
 //! if let Err(e) = pn532.process(&Request::sam_configuration(SAMMode::Normal, false), 0, 50.ms()){
 //!     println!("Could not initialize PN532: {e:?}")
 //! }
@@ -57,7 +53,7 @@ use core::fmt::Debug;
 use core::task::Poll;
 use core::time::Duration;
 
-pub use crate::protocol::{Error, Pn532, CountDown};
+pub use crate::protocol::{CountDown, Error, Pn532};
 pub use crate::requests::Request;
 
 pub mod i2c;
@@ -74,7 +70,11 @@ pub trait Interface {
     /// Error specific to the serial link.
     type Error: Debug;
     /// Writes a `frame` to the Pn532
-    fn write(&mut self, frame: &[u8]) -> Result<(), Self::Error>;
+    ///
+    /// # Note
+    /// `frame` is passed as mutable reference to allow the SPI driver to reverse the bit order
+    /// when the `msb-spi` feature is enabled.
+    fn write(&mut self, frame: &mut [u8]) -> Result<(), Self::Error>;
     /// Checks if the Pn532 has data to be read.
     /// Uses either the serial link or the IRQ pin.
     fn wait_ready(&mut self) -> Poll<Result<(), Self::Error>>;
@@ -86,7 +86,7 @@ pub trait Interface {
 impl<I: Interface> Interface for &mut I {
     type Error = I::Error;
 
-    fn write(&mut self, frame: &[u8]) -> Result<(), Self::Error> {
+    fn write(&mut self, frame: &mut [u8]) -> Result<(), Self::Error> {
         I::write(self, frame)
     }
 

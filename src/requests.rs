@@ -13,16 +13,9 @@ pub struct BorrowedRequest<'a> {
     pub data: &'a [u8],
 }
 
-impl<'a> BorrowedRequest<'a> {
-    #[inline]
-    pub const fn new(command: Command, data: &'a [u8]) -> Self {
-        Self {command, data}
-    }
-}
-
-impl<'a, const N: usize> Into<BorrowedRequest<'a>> for &'a Request<N> {
-    fn into(self) -> BorrowedRequest<'a> {
-        BorrowedRequest::new(self.command, &self.data)
+impl<'a, const N: usize> From<&'a Request<N>> for BorrowedRequest<'a> {
+    fn from(value: &'a Request<N>) -> BorrowedRequest<'a> {
+        BorrowedRequest::new(value.command, &value.data)
     }
 }
 
@@ -30,6 +23,13 @@ impl<const N: usize> Request<N> {
     #[inline]
     pub const fn new(command: Command, data: [u8; N]) -> Self {
         Request { command, data }
+    }
+}
+
+impl<'a> BorrowedRequest<'a> {
+    #[inline]
+    pub const fn new(command: Command, data: &'a [u8]) -> Self {
+        Self { command, data }
     }
 }
 
