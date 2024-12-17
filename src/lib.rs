@@ -14,6 +14,20 @@
 //! * [`i2c::I2CInterfaceWithIrq`]
 //! * [`serialport::SerialPortInterface`]
 //!
+//! # Troubleshooting
+//! ### General
+//! * check you're using [`Request::sam_configuration`] to initialize the PN532
+//!
+//! ### I2C
+//! * check wiring
+//! * check you're using external pull-up resistors
+//!
+//! ### SPI
+//! * check wiring
+//! * check you set the SPI mode to `Mode0` (CPOL = 0, CPHA = 0)
+//! * check you set the SPI to LSB mode (oftentimes this is not the default) **or** enable the `msb-spi` feature
+//!
+//!
 //! # SPI example
 //! ```
 //! # use pn532::doc_test_helper::{NoOpSPI, NoOpTimer};
