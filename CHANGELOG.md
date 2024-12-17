@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Changed
+
+- migrate to embedded-hal 1.0 #22
+- provide our own CountDown trait instead of the one from embedded-hal 0.2.7 #22
+- no longer ignore I2C errors in I2CInterface::wait_ready dfc595ec
+
 ## [0.4.0]
 
 ### Added
