@@ -25,3 +25,6 @@ jobs:
 
       - name: Run tests
         run: cargo test
+
+      - name: Run tests with msb-spi feature
+        run: cargo test --features msb-spi

@@ -99,7 +99,7 @@ where
 }
 
 #[cfg(test)]
-mod tests {
+pub mod tests {
     use super::*;
     use embedded_hal::digital::ErrorType;
     use embedded_hal_mock::eh1::digital::Transaction as DigitalTransaction;
@@ -140,12 +140,12 @@ mod tests {
     }
 
     /// Wrapper around `DigitalMock` that is "infallible"
-    struct PinMock {
-        mock: DigitalMock,
+    pub struct PinMock {
+        pub mock: DigitalMock,
     }
 
     impl PinMock {
-        fn new(transactions: &[DigitalTransaction]) -> Self {
+        pub fn new(transactions: &[DigitalTransaction]) -> Self {
             Self {
                 mock: DigitalMock::new(transactions),
             }
