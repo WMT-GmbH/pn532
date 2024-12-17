@@ -37,3 +37,4 @@ required-features = ["std"]
 log = "0.4"
 env_logger = "0.7"
 clap = "2.33.3"
+embedded-hal-mock = "0.11.1"

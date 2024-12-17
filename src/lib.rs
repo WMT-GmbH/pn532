@@ -60,7 +60,7 @@
 //! Enable the std feature to use [`serialport::SerialPortInterface`]
 //! Only works for [targets](https://github.com/serialport/serialport-rs#platform-support) supported by the `serialport` crate.
 
-#![cfg_attr(not(any(feature = "std", doc)), no_std)]
+#![cfg_attr(not(any(feature = "std", doc, test)), no_std)]
 #![cfg_attr(doc, feature(doc_cfg))]
 
 use core::fmt::Debug;
