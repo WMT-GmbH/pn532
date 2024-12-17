@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.5.0]
+
 ### Changed
 
 - migrate to embedded-hal 1.0 #22
