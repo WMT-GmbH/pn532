@@ -64,7 +64,7 @@ impl<E: Debug> From<E> for Error<E> {
 /// where
 /// * `N` is the const generic type parameter of this struct.
 /// * `response_len` is the largest number passed to
-/// [`receive_response`](Pn532::receive_response), [`process`](Pn532::process) or [`process_async`](Pn532::process_async)
+///   [`receive_response`](Pn532::receive_response), [`process`](Pn532::process) or [`process_async`](Pn532::process_async)
 /// * `M` is the largest const generic type parameter of [`Request`](crate::requests::Request) references passed to any sending methods of this struct
 #[derive(Clone, Debug)]
 pub struct Pn532<I, T, const N: usize = 32> {
@@ -77,8 +77,7 @@ pub struct Pn532<I, T, const N: usize = 32> {
 ///
 /// # Contract
 ///
-/// - `self.start(count); block!(self.wait());` MUST block for AT LEAST the time specified by
-/// `count`.
+/// - `self.start(count); block!(self.wait());` MUST block for AT LEAST the time specified by `count`.
 ///
 /// *Note* that the implementer doesn't necessarily have to be a *downcounting* timer; it could also
 /// be an *upcounting* timer as long as the above contract is upheld.
