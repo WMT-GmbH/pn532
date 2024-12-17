@@ -21,6 +21,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Get newest stable
+        run: rustup update stable && rustup default stable
+
       - name: Use cache
         uses: Swatinem/rust-cache@v2
 
