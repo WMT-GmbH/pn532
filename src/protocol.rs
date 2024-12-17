@@ -424,7 +424,7 @@ struct WaitReadyFuture<'a, I> {
     interface: &'a mut I,
 }
 
-impl<'a, I: Interface> Future for WaitReadyFuture<'a, I> {
+impl<I: Interface> Future for WaitReadyFuture<'_, I> {
     type Output = Result<(), I::Error>;
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let poll = self.interface.wait_ready();
