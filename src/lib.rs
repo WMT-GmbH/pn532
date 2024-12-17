@@ -61,7 +61,7 @@
 //! Only works for [targets](https://github.com/serialport/serialport-rs#platform-support) supported by the `serialport` crate.
 
 #![cfg_attr(not(any(feature = "std", doc, test)), no_std)]
-#![cfg_attr(doc, feature(doc_cfg))]
+#![cfg_attr(docsrs, feature(doc_cfg))]
 
 use core::fmt::Debug;
 use core::task::Poll;
@@ -74,7 +74,7 @@ pub mod i2c;
 mod protocol;
 pub mod requests;
 #[cfg(feature = "std")]
-#[cfg_attr(doc, doc(cfg(feature = "std")))]
+#[cfg_attr(docsrs, doc(cfg(feature = "std")))]
 pub mod serialport;
 pub mod spi;
 
