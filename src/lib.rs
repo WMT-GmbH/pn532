@@ -69,6 +69,7 @@ use core::time::Duration;
 
 pub use crate::protocol::{CountDown, Error, Pn532};
 pub use crate::requests::Request;
+pub use nb;
 
 pub mod i2c;
 mod protocol;

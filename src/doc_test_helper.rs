@@ -43,3 +43,29 @@ impl CountDown for NoOpTimer {
         Ok(())
     }
 }
+
+/// used in CountDown example implementation
+pub mod esp_hal {
+    pub mod timer {
+        use super::super::*;
+
+        #[allow(unused)]
+        pub struct PeriodicTimer<'a, T>(&'a T);
+
+        impl<'a, T> PeriodicTimer<'_, T>
+        where
+            T: Timer,
+        {
+            pub fn start(&self, _: MicrosDurationU64) -> Result<(), Infallible> {
+                unimplemented!()
+            }
+
+            pub fn wait(&self) -> Result<(), Infallible> {
+                unimplemented!()
+            }
+        }
+        pub trait Timer {}
+    }
+}
+
+pub struct MicrosDurationU64;

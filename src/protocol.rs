@@ -75,6 +75,38 @@ pub struct Pn532<I, T, const N: usize = 32> {
 
 /// A count-down timer
 ///
+/// # Example implementation for the [esp_hal](https://crates.io/crates/esp-hal/0.22.0) (0.22.0) crate
+/// ```
+/// # use pn532::doc_test_helper::{esp_hal, MicrosDurationU64};
+/// # use core::convert::Infallible;
+/// # use pn532::CountDown;
+///
+/// struct TimerWrapper<'a, T> {
+///     timer: esp_hal::timer::PeriodicTimer<'a, T>,
+/// }
+///
+/// impl<'a, TIM> CountDown for TimerWrapper<'a, TIM>
+/// where
+///     TIM: esp_hal::timer::Timer,
+/// {
+///     type Time = MicrosDurationU64;
+///     fn start<T>(&mut self, timeout: T)
+///     where
+///         T: Into<Self::Time>,
+///     {
+///         self.timer.start(timeout.into()).unwrap();
+///     }
+///
+///     fn wait(&mut self) -> nb::Result<(), Infallible> {
+///         // convert nb::Result<(), void::Void> to nb::Result<(), Infallible>
+///         match self.timer.wait() {
+///             Ok(_) => Ok(()),
+///             Err(_) => Err(nb::Error::WouldBlock),
+///         }
+///     }
+/// }
+/// ```
+///
 /// # Contract
 ///
 /// - `self.start(count); block!(self.wait());` MUST block for AT LEAST the time specified by `count`.
