@@ -52,7 +52,7 @@ pub mod esp_hal {
         #[allow(unused)]
         pub struct PeriodicTimer<'a, T>(&'a T);
 
-        impl<'a, T> PeriodicTimer<'_, T>
+        impl<T> PeriodicTimer<'_, T>
         where
             T: Timer,
         {
