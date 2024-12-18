@@ -5,12 +5,19 @@
 //!
 //! The SPI peripheral should be in **lsb mode**.
 //! If your peripheral cannot be set to **lsb mode** you need to enable the `msb-spi` feature of this crate.
+#[cfg(feature = "is_sync")]
 use core::convert::Infallible;
 use core::fmt::Debug;
+#[cfg(feature = "is_sync")]
 use core::task::Poll;
 
+#[cfg(feature = "is_sync")]
 use embedded_hal::digital::InputPin;
+
+#[cfg(feature = "is_sync")]
 use embedded_hal::spi::{Operation, SpiDevice};
+#[cfg(not(feature = "is_sync"))]
+use embedded_hal_async::spi::{Operation, SpiDevice};
 
 use crate::Interface;
 
@@ -41,13 +48,14 @@ where
     pub spi: SPI,
 }
 
+#[maybe_async::maybe_async(AFIT)]
 impl<SPI> Interface for SPIInterface<SPI>
 where
     SPI: SpiDevice,
 {
     type Error = <SPI as embedded_hal::spi::ErrorType>::Error;
 
-    fn write(&mut self, frame: &mut [u8]) -> Result<(), Self::Error> {
+    async fn write(&mut self, frame: &mut [u8]) -> Result<(), Self::Error> {
         #[cfg(feature = "msb-spi")]
         for byte in frame.iter_mut() {
             *byte = byte.reverse_bits();
@@ -55,9 +63,10 @@ where
         self.spi.transaction(&mut [
             Operation::Write(&[PN532_SPI_DATAWRITE]),
             Operation::Write(frame),
-        ])
+        ]).await
     }
 
+    #[maybe_async::sync_impl]
     fn wait_ready(&mut self) -> Poll<Result<(), Self::Error>> {
         let mut buf = [PN532_SPI_STATREAD, 0x00];
 
@@ -70,11 +79,22 @@ where
         }
     }
 
-    fn read(&mut self, buf: &mut [u8]) -> Result<(), Self::Error> {
+    #[maybe_async::async_impl]
+    async fn wait_ready(&mut self) -> Result<(), Self::Error> {
+        let mut buf = [PN532_SPI_STATREAD, 0x00];
+
+        while buf[1] != PN532_SPI_READY {
+            buf = [PN532_SPI_STATREAD, 0x00];
+            self.spi.transfer_in_place(&mut buf).await?;
+        }
+        Ok(())
+    }
+
+    async fn read(&mut self, buf: &mut [u8]) -> Result<(), Self::Error> {
         self.spi.transaction(&mut [
             Operation::Write(&[PN532_SPI_DATAREAD]),
             Operation::Read(buf),
-        ])?;
+        ]).await?;
 
         #[cfg(feature = "msb-spi")]
         for byte in buf.iter_mut() {
@@ -85,7 +105,9 @@ where
 }
 
 /// SPI Interface with IRQ pin
+#[maybe_async::sync_impl]
 #[derive(Clone, Debug)]
+#[maybe_async::sync_impl]
 pub struct SPIInterfaceWithIrq<SPI, IRQ>
 where
     SPI: SpiDevice,
@@ -95,6 +117,7 @@ where
     pub irq: IRQ,
 }
 
+#[maybe_async::sync_impl]
 impl<SPI, IRQ> Interface for SPIInterfaceWithIrq<SPI, IRQ>
 where
     SPI: SpiDevice,

@@ -66,7 +66,6 @@ pub mod requests;
 #[cfg(feature = "is_sync")]
 pub mod serialport;
 
-#[cfg(feature = "is_sync")]
 pub mod spi;
 
 /// Abstraction over the different serial links.
