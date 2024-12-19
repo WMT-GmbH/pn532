@@ -98,10 +98,10 @@ pub struct Pn532<I, T, const N: usize = 32> {
 ///     }
 ///
 ///     fn wait(&mut self) -> nb::Result<(), Infallible> {
-///         // convert nb::Result<(), void::Void> to nb::Result<(), Infallible>
 ///         match self.timer.wait() {
 ///             Ok(_) => Ok(()),
-///             Err(_) => Err(nb::Error::WouldBlock),
+///             Err(nb::Error::WouldBlock) => Err(nb::Error::WouldBlock),
+///             Err(nb::Error::Other(_)) => unreachable!(),
 ///         }
 ///     }
 /// }

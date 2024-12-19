@@ -60,7 +60,7 @@ pub mod esp_hal {
                 unimplemented!()
             }
 
-            pub fn wait(&self) -> Result<(), Infallible> {
+            pub fn wait(&self) -> nb::Result<(), Infallible> {
                 unimplemented!()
             }
         }
