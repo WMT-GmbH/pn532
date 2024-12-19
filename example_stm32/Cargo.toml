@@ -1,0 +1,15 @@
+[package]
+name = "stm32"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+pn532 = { version = "0.5.0", path = ".." }
+
+stm32f4xx-hal = { version = "0.22.1", features = ["stm32f405"] }
+rtt-target = "0.6.1"
+panic-rtt-target = "0.2.0"
+cortex-m-rt = "0.7.5"
+embedded-hal = "1.0.0"
+embedded-hal-bus = "0.2.0"
+fugit = "0.3.7"

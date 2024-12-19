@@ -34,8 +34,8 @@ name = "hsu-test-util"
 required-features = ["std"]
 
 [dev-dependencies]
-# hsu-test-serialport
-log = "0.4"
+embedded-hal-mock = "0.11.1"
+
+# hsu-test-util
 env_logger = "0.7"
 clap = "2.33.3"
-embedded-hal-mock = "0.11.1"
