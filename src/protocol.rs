@@ -106,6 +106,13 @@ pub trait CountDown {
 
 #[maybe_async::maybe_async(AFIT)]
 impl<I: Interface, T: CountDown, const N: usize> Pn532<I, T, N> {
+    /// Wake up the PN532 prior to any other interaction with it
+    /// Required when using SPI.
+    #[inline]
+    pub async fn wake_up(&mut self) -> Result<(), I::Error> {
+        self.interface.wake_up().await
+    }
+
     /// Send a request, wait for an ACK and then wait for a response.
     ///
     /// `response_len` is the largest expected length of the returned data.

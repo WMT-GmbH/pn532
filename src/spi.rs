@@ -54,6 +54,9 @@ where
     SPI: SpiDevice,
 {
     type Error = <SPI as embedded_hal::spi::ErrorType>::Error;
+    async fn wake_up(&mut self) -> Result<(), Self::Error> {
+        self.spi.transaction(&mut [Operation::DelayNs(2_000_000)]).await
+    }
 
     async fn write(&mut self, frame: &mut [u8]) -> Result<(), Self::Error> {
         #[cfg(feature = "msb-spi")]
@@ -124,6 +127,10 @@ where
     IRQ: InputPin<Error = Infallible>,
 {
     type Error = <SPI as embedded_hal::spi::ErrorType>::Error;
+
+    fn wake_up(&mut self) -> Result<(), Self::Error> {
+        self.spi.transaction(&mut [Operation::DelayNs(2_000_000)])
+    }
 
     fn write(&mut self, frame: &mut [u8]) -> Result<(), Self::Error> {
         #[cfg(feature = "msb-spi")]

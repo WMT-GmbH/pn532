@@ -46,6 +46,9 @@ where
         self.i2c.write(I2C_ADDRESS, frame).await
     }
 
+    async fn wake_up(&mut self) -> Result<(), Self::Error> {
+        Ok(())
+    }
     // wait_ready implementations differ between sync / async
 
     #[maybe_async::sync_impl]
@@ -104,6 +107,10 @@ where
     IRQ: InputPin<Error = Infallible>,
 {
     type Error = <I2C as embedded_hal::i2c::ErrorType>::Error;
+
+    fn wake_up(&mut self) -> Result<(), Self::Error> {
+        Ok(())
+    }
 
     fn write(&mut self, frame: &mut [u8]) -> Result<(), Self::Error> {
         self.i2c.write(I2C_ADDRESS, frame)

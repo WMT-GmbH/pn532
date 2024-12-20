@@ -87,6 +87,8 @@ pub trait Interface {
     /// Reads data from the Pn532 into `buf`.
     /// This method will only be called if `wait_ready` returned `Poll::Ready(Ok(()))` before.
     fn read(&mut self, buf: &mut [u8]) -> Result<(), Self::Error>;
+    /// Wakes up the PN532 prior to first communication, in case of SPI
+    fn wake_up(&mut self) -> Result<(), Self::Error>;
 }
 
 #[cfg(not(feature = "is_sync"))]
@@ -110,6 +112,7 @@ pub trait Interface {
         &mut self,
         buf: &mut [u8],
     ) -> impl core::future::Future<Output = Result<(), Self::Error>>;
+    fn wake_up(&mut self) -> impl core::future::Future<Output = Result<(), Self::Error>>;
 }
 
 // This is how I'd want to define it with maybe_async, but it generates warnings, maybe better to just disable them?
@@ -133,6 +136,10 @@ pub trait Interface {
 #[maybe_async::maybe_async(AFIT)]
 impl<I: Interface> Interface for &mut I {
     type Error = I::Error;
+
+    async fn wake_up(&mut self) -> Result<(), Self::Error> {
+        I::wake_up(self).await
+    }
 
     async fn write(&mut self, frame: &mut [u8]) -> Result<(), Self::Error> {
         I::write(self, frame).await
