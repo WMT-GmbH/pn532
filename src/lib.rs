@@ -14,6 +14,20 @@
 //! * [`i2c::I2CInterfaceWithIrq`]
 //! * [`serialport::SerialPortInterface`]
 //!
+//! # Troubleshooting
+//! ### General
+//! * check you're using [`Request::sam_configuration`] to initialize the PN532
+//!
+//! ### I2C
+//! * check wiring
+//! * check you're using external pull-up resistors
+//!
+//! ### SPI
+//! * check wiring
+//! * check you set the SPI mode to `Mode0` (CPOL = 0, CPHA = 0)
+//! * check you set the SPI to LSB mode (oftentimes this is not the default) **or** enable the `msb-spi` feature
+//!
+//!
 //! # SPI example
 //! ```
 //! # use pn532::doc_test_helper::{NoOpSPI, NoOpTimer};
@@ -46,8 +60,8 @@
 //! Enable the std feature to use [`serialport::SerialPortInterface`]
 //! Only works for [targets](https://github.com/serialport/serialport-rs#platform-support) supported by the `serialport` crate.
 
-#![cfg_attr(not(any(feature = "std", doc)), no_std)]
-#![cfg_attr(doc, feature(doc_cfg))]
+#![cfg_attr(not(any(feature = "std", doc, test)), no_std)]
+#![cfg_attr(docsrs, feature(doc_cfg))]
 
 use core::fmt::Debug;
 #[cfg(feature = "is_sync")]
@@ -56,13 +70,14 @@ use core::time::Duration;
 
 pub use crate::protocol::{CountDown, Error, Pn532};
 pub use crate::requests::Request;
+pub use nb;
 
 pub mod i2c;
 // pub mod i2c_async;
 mod protocol;
 pub mod requests;
 #[cfg(feature = "std")]
-#[cfg_attr(doc, doc(cfg(feature = "std")))]
+#[cfg_attr(docsrs, doc(cfg(feature = "std")))]
 #[cfg(feature = "is_sync")]
 pub mod serialport;
 

@@ -1,7 +1,7 @@
 [package]
 name = "pn532"
 description = "PN532 protocol implementation"
-version = "0.4.0"
+version = "0.5.0"
 edition = "2021"
 repository = "https://github.com/WMT-GmbH/pn532"
 license = "MIT OR Apache-2.0"
@@ -33,6 +33,7 @@ is_sync = ["maybe-async/is_sync"]
 
 [package.metadata.docs.rs]
 all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
 
 [[example]]
 name = "hsu-test-util"
@@ -43,3 +44,4 @@ required-features = ["std"]
 log = "0.4"
 env_logger = "0.7"
 clap = "2.33.3"
+embedded-hal-mock = "0.11.1"

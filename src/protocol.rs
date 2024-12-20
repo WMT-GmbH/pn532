@@ -65,7 +65,7 @@ impl<E: Debug> From<E> for Error<E> {
 /// where
 /// * `N` is the const generic type parameter of this struct.
 /// * `response_len` is the largest number passed to
-/// [`receive_response`](Pn532::receive_response), [`process`](Pn532::process) or [`process_async`](Pn532::process_async)
+///   [`receive_response`](Pn532::receive_response), [`process`](Pn532::process) or [`process_async`](Pn532::process_async)
 /// * `M` is the largest const generic type parameter of [`Request`](crate::requests::Request) references passed to any sending methods of this struct
 #[derive(Clone, Debug)]
 pub struct Pn532<I, T, const N: usize = 32> {
@@ -76,10 +76,41 @@ pub struct Pn532<I, T, const N: usize = 32> {
 
 /// A count-down timer
 ///
+/// # Example implementation for the [esp_hal](https://crates.io/crates/esp-hal/0.22.0) (0.22.0) crate
+/// ```
+/// # use pn532::doc_test_helper::{esp_hal, MicrosDurationU64};
+/// # use core::convert::Infallible;
+/// # use pn532::CountDown;
+///
+/// struct TimerWrapper<'a, T> {
+///     timer: esp_hal::timer::PeriodicTimer<'a, T>,
+/// }
+///
+/// impl<'a, TIM> CountDown for TimerWrapper<'a, TIM>
+/// where
+///     TIM: esp_hal::timer::Timer,
+/// {
+///     type Time = MicrosDurationU64;
+///     fn start<T>(&mut self, timeout: T)
+///     where
+///         T: Into<Self::Time>,
+///     {
+///         self.timer.start(timeout.into()).unwrap();
+///     }
+///
+///     fn wait(&mut self) -> nb::Result<(), Infallible> {
+///         match self.timer.wait() {
+///             Ok(_) => Ok(()),
+///             Err(nb::Error::WouldBlock) => Err(nb::Error::WouldBlock),
+///             Err(nb::Error::Other(_)) => unreachable!(),
+///         }
+///     }
+/// }
+/// ```
+///
 /// # Contract
 ///
-/// - `self.start(count); block!(self.wait());` MUST block for AT LEAST the time specified by
-/// `count`.
+/// - `self.start(count); block!(self.wait());` MUST block for AT LEAST the time specified by `count`.
 ///
 /// *Note* that the implementer doesn't necessarily have to be a *downcounting* timer; it could also
 /// be an *upcounting* timer as long as the above contract is upheld.
@@ -475,7 +506,7 @@ struct WaitReadyFuture<'a, I> {
 }
 
 #[maybe_async::sync_impl]
-impl<'a, I: Interface> Future for WaitReadyFuture<'a, I> {
+impl<I: Interface> Future for WaitReadyFuture<'_, I> {
     type Output = Result<(), I::Error>;
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let poll = self.interface.wait_ready();

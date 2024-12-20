@@ -55,7 +55,9 @@ where
 {
     type Error = <SPI as embedded_hal::spi::ErrorType>::Error;
     async fn wake_up(&mut self) -> Result<(), Self::Error> {
-        self.spi.transaction(&mut [Operation::DelayNs(2_000_000)]).await
+        self.spi
+            .transaction(&mut [Operation::DelayNs(2_000_000)])
+            .await
     }
 
     async fn write(&mut self, frame: &mut [u8]) -> Result<(), Self::Error> {
@@ -63,10 +65,12 @@ where
         for byte in frame.iter_mut() {
             *byte = byte.reverse_bits();
         }
-        self.spi.transaction(&mut [
-            Operation::Write(&[PN532_SPI_DATAWRITE]),
-            Operation::Write(frame),
-        ]).await
+        self.spi
+            .transaction(&mut [
+                Operation::Write(&[PN532_SPI_DATAWRITE]),
+                Operation::Write(frame),
+            ])
+            .await
     }
 
     #[maybe_async::sync_impl]
@@ -94,10 +98,12 @@ where
     }
 
     async fn read(&mut self, buf: &mut [u8]) -> Result<(), Self::Error> {
-        self.spi.transaction(&mut [
-            Operation::Write(&[PN532_SPI_DATAREAD]),
-            Operation::Read(buf),
-        ]).await?;
+        self.spi
+            .transaction(&mut [
+                Operation::Write(&[PN532_SPI_DATAREAD]),
+                Operation::Read(buf),
+            ])
+            .await?;
 
         #[cfg(feature = "msb-spi")]
         for byte in buf.iter_mut() {
@@ -163,5 +169,91 @@ where
             *byte = byte.reverse_bits();
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::i2c::tests::PinMock;
+    use embedded_hal_mock::eh1::digital::State;
+    use embedded_hal_mock::eh1::digital::Transaction as DigitalTransaction;
+    use embedded_hal_mock::eh1::spi::Mock as SpiMock;
+    use embedded_hal_mock::eh1::spi::Transaction as SpiTransaction;
+
+    #[test]
+    fn test_spi() {
+        let mut spi = SPIInterface {
+            spi: SpiMock::new(&[
+                // write
+                SpiTransaction::transaction_start(),
+                SpiTransaction::write(as_lsb(0x01)),
+                SpiTransaction::write_vec(vec![as_lsb(1), as_lsb(2)]),
+                SpiTransaction::transaction_end(),
+                // wait_ready
+                SpiTransaction::transaction_start(),
+                SpiTransaction::transfer_in_place(
+                    vec![as_lsb(0x02), as_lsb(0x00)],
+                    vec![as_lsb(0x00), as_lsb(0x00)],
+                ),
+                SpiTransaction::transaction_end(),
+                SpiTransaction::transaction_start(),
+                SpiTransaction::transfer_in_place(
+                    vec![as_lsb(0x02), as_lsb(0x00)],
+                    vec![as_lsb(0x00), as_lsb(0x01)],
+                ),
+                SpiTransaction::transaction_end(),
+                // read
+                SpiTransaction::transaction_start(),
+                SpiTransaction::write(as_lsb(0x03)),
+                SpiTransaction::read_vec(vec![as_lsb(3), as_lsb(4)]),
+                SpiTransaction::transaction_end(),
+            ]),
+        };
+
+        spi.write(&mut [1, 2]).unwrap();
+
+        assert_eq!(spi.wait_ready(), Poll::Pending);
+        assert_eq!(spi.wait_ready(), Poll::Ready(Ok(())));
+
+        let mut buf = [0, 0];
+        spi.read(&mut buf).unwrap();
+        assert_eq!(buf, [3, 4]);
+
+        spi.spi.done();
+    }
+
+    #[test]
+    fn test_spi_with_irq() {
+        let mut spi = SPIInterfaceWithIrq {
+            spi: SpiMock::new(&[
+                // write
+                SpiTransaction::transaction_start(),
+                SpiTransaction::write(as_lsb(0x01)),
+                SpiTransaction::write_vec(vec![as_lsb(1), as_lsb(2)]),
+                SpiTransaction::transaction_end(),
+                // read
+                SpiTransaction::transaction_start(),
+                SpiTransaction::write(as_lsb(0x03)),
+                SpiTransaction::read_vec(vec![as_lsb(3), as_lsb(4)]),
+                SpiTransaction::transaction_end(),
+            ]),
+            irq: PinMock::new(&[
+                DigitalTransaction::get(State::High),
+                DigitalTransaction::get(State::Low),
+            ]),
+        };
+
+        spi.write(&mut [1, 2]).unwrap();
+
+        assert_eq!(spi.wait_ready(), Poll::Pending);
+        assert_eq!(spi.wait_ready(), Poll::Ready(Ok(())));
+
+        let mut buf = [0, 0];
+        spi.read(&mut buf).unwrap();
+        assert_eq!(buf, [3, 4]);
+
+        spi.spi.done();
+        spi.irq.mock.done();
     }
 }

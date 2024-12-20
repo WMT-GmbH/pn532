@@ -14,7 +14,7 @@ use embedded_hal::i2c::I2c as embedded_I2c;
 use embedded_hal_async::i2c::I2c as embedded_I2c;
 
 use crate::Interface;
-use embedded_hal::i2c::Operation;
+use embedded_hal::i2c::{Error, ErrorKind, NoAcknowledgeSource, Operation};
 
 /// To be used in `Interface::wait_ready` implementations
 pub const PN532_I2C_READY: u8 = 0x01;
@@ -23,10 +23,6 @@ pub const PN532_I2C_READY: u8 = 0x01;
 pub const I2C_ADDRESS: u8 = 0x24;
 
 /// I2C Interface without IRQ pin
-///
-/// # Note:
-/// Currently the implementation of [`I2CInterface::wait_ready`] ignores any I2C errors.
-/// See this [issue](https://github.com/WMT-GmbH/pn532/issues/4) for an explanation.
 #[derive(Clone, Debug)]
 pub struct I2CInterface<I2C>
 where
@@ -49,15 +45,21 @@ where
     async fn wake_up(&mut self) -> Result<(), Self::Error> {
         Ok(())
     }
+
     // wait_ready implementations differ between sync / async
 
     #[maybe_async::sync_impl]
     fn wait_ready(&mut self) -> Poll<Result<(), Self::Error>> {
         let mut buf = [0];
-        self.i2c.read(I2C_ADDRESS, &mut buf).ok();
-        // It's possible that the PN532 does not ACK the read request when it is not ready.
-        // Since we don't know the concrete type of `Self::Error` unfortunately we have to ignore all interface errors here.
-        // See https://github.com/WMT-GmbH/pn532/issues/4 for more info
+        if let Err(e) = self.i2c.read(I2C_ADDRESS, &mut buf) {
+            // It's possible that the PN532 does not ACK the read request when it is not ready.
+            // See https://github.com/WMT-GmbH/pn532/issues/4 for more info
+            return match e.kind() {
+                ErrorKind::NoAcknowledge(NoAcknowledgeSource::Address)
+                | ErrorKind::NoAcknowledge(NoAcknowledgeSource::Unknown) => Poll::Pending,
+                _ => Poll::Ready(Err(e)),
+            };
+        }
 
         if buf[0] == PN532_I2C_READY {
             Poll::Ready(Ok(()))
@@ -69,10 +71,15 @@ where
     async fn wait_ready(&mut self) -> Result<(), Self::Error> {
         let mut buf = [0];
         while buf[0] != PN532_I2C_READY {
-            let _ = self.i2c.read(I2C_ADDRESS, &mut buf).await;
-            // It's possible that the PN532 does not ACK the read request when it is not ready.
-            // Since we don't know the concrete type of `Self::Error` unfortunately we have to ignore all interface errors here.
-            // See https://github.com/WMT-GmbH/pn532/issues/4 for more info
+            if let Err(e) = self.i2c.read(I2C_ADDRESS, &mut buf).await {
+                // It's possible that the PN532 does not ACK the read request when it is not ready.
+                // See https://github.com/WMT-GmbH/pn532/issues/4 for more info
+                match e.kind() {
+                    ErrorKind::NoAcknowledge(NoAcknowledgeSource::Address)
+                    | ErrorKind::NoAcknowledge(NoAcknowledgeSource::Unknown) => (),
+                    _ => return Err(e),
+                };
+            }
         }
         Ok(())
     }
@@ -130,5 +137,105 @@ where
             I2C_ADDRESS,
             &mut [Operation::Read(&mut [0]), Operation::Read(buf)],
         )
+    }
+}
+
+#[cfg(test)]
+pub mod tests {
+    use super::*;
+    use embedded_hal::digital::ErrorType;
+    use embedded_hal_mock::eh1::digital::Transaction as DigitalTransaction;
+    use embedded_hal_mock::eh1::digital::{Mock as DigitalMock, State};
+    use embedded_hal_mock::eh1::i2c::Mock as I2cMock;
+    use embedded_hal_mock::eh1::i2c::Transaction as I2cTransaction;
+
+    #[test]
+    fn test_i2c() {
+        let mut i2c = I2CInterface {
+            i2c: I2cMock::new(&[
+                // write
+                I2cTransaction::write(I2C_ADDRESS, vec![1, 2]),
+                // wait_ready
+                I2cTransaction::read(I2C_ADDRESS, vec![0x00]),
+                I2cTransaction::read(I2C_ADDRESS, vec![0x00])
+                    .with_error(ErrorKind::NoAcknowledge(NoAcknowledgeSource::Address)),
+                I2cTransaction::read(I2C_ADDRESS, vec![0x01]),
+                // read
+                I2cTransaction::transaction_start(I2C_ADDRESS),
+                I2cTransaction::read(I2C_ADDRESS, vec![0]),
+                I2cTransaction::read(I2C_ADDRESS, vec![3, 4]),
+                I2cTransaction::transaction_end(I2C_ADDRESS),
+            ]),
+        };
+
+        i2c.write(&mut [1, 2]).unwrap();
+
+        assert_eq!(i2c.wait_ready(), Poll::Pending);
+        assert_eq!(i2c.wait_ready(), Poll::Pending);
+        assert_eq!(i2c.wait_ready(), Poll::Ready(Ok(())));
+
+        let mut buf = [0, 0];
+        i2c.read(&mut buf).unwrap();
+        assert_eq!(buf, [3, 4]);
+
+        i2c.i2c.done();
+    }
+
+    /// Wrapper around `DigitalMock` that is "infallible"
+    pub struct PinMock {
+        pub mock: DigitalMock,
+    }
+
+    impl PinMock {
+        pub fn new(transactions: &[DigitalTransaction]) -> Self {
+            Self {
+                mock: DigitalMock::new(transactions),
+            }
+        }
+    }
+
+    impl ErrorType for PinMock {
+        type Error = Infallible;
+    }
+
+    impl InputPin for PinMock {
+        fn is_high(&mut self) -> Result<bool, Self::Error> {
+            self.mock.is_high().map_err(|e| panic!("{:?}", e))
+        }
+
+        fn is_low(&mut self) -> Result<bool, Self::Error> {
+            self.mock.is_low().map_err(|e| panic!("{:?}", e))
+        }
+    }
+
+    #[test]
+    fn test_i2c_with_irq() {
+        let mut i2c = I2CInterfaceWithIrq {
+            i2c: I2cMock::new(&[
+                // write
+                I2cTransaction::write(I2C_ADDRESS, vec![1, 2]),
+                // read
+                I2cTransaction::transaction_start(I2C_ADDRESS),
+                I2cTransaction::read(I2C_ADDRESS, vec![0]),
+                I2cTransaction::read(I2C_ADDRESS, vec![3, 4]),
+                I2cTransaction::transaction_end(I2C_ADDRESS),
+            ]),
+            irq: PinMock::new(&[
+                DigitalTransaction::get(State::High),
+                DigitalTransaction::get(State::Low),
+            ]),
+        };
+
+        i2c.write(&mut [1, 2]).unwrap();
+
+        assert_eq!(i2c.wait_ready(), Poll::Pending);
+        assert_eq!(i2c.wait_ready(), Poll::Ready(Ok(())));
+
+        let mut buf = [0, 0];
+        i2c.read(&mut buf).unwrap();
+        assert_eq!(buf, [3, 4]);
+
+        i2c.i2c.done();
+        i2c.irq.mock.done();
     }
 }

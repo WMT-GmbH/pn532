@@ -18,6 +18,20 @@ over these different links.
 * `i2c::I2CInterface`
 * `i2c::I2CInterfaceWithIrq`
 
+
+# Troubleshooting
+### General
+* check you're using `Request::sam_configuration` to initialize the PN532
+
+### I2C
+* check wiring
+* check you're using external pull-up resistors
+
+### SPI
+* check wiring
+* check you set the SPI mode to `Mode0` (CPOL = 0, CPHA = 0)
+* check you set the SPI to LSB mode (oftentimes this is not the default) **or** enable the `msb-spi` feature
+
 ## SPI example
 ```rust
 use pn532::{requests::SAMMode, spi::SPIInterface, Pn532, Request};
