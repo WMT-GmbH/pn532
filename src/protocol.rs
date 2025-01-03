@@ -204,7 +204,6 @@ impl<I: Interface, T: CountDown, const N: usize> Pn532<I, T, N> {
     /// pn532.process_no_response(&Request::INLIST_ONE_ISO_A_TARGET, 5.ms());
     /// ```
     #[inline]
-
     pub async fn process_no_response<'a>(
         &mut self,
         request: impl Into<BorrowedRequest<'a>>,
