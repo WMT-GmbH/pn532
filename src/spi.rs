@@ -39,19 +39,94 @@ pub const PN532_SPI_DATAREAD: u8 = as_lsb(0x03);
 /// To be used in `Interface::wait_ready` implementations
 pub const PN532_SPI_READY: u8 = as_lsb(0x01);
 
-/// SPI Interface without IRQ pin
+#[cfg(not(feature = "is_sync"))]
+pub trait IRQTraitAlias: embedded_hal_async::digital::Wait {}
+#[cfg(not(feature = "is_sync"))]
+impl<T: embedded_hal_async::digital::Wait> IRQTraitAlias for T {}
+
+#[cfg(feature = "is_sync")]
+pub trait IRQTraitAlias: embedded_hal::digital::InputPin {}
+#[cfg(feature = "is_sync")]
+impl<T: embedded_hal::digital::InputPin> IRQTraitAlias for T {}
+
+/// SPI Interface with and without IRQ pin, sync is polling also when using IRQ
 #[derive(Clone, Debug)]
-pub struct SPIInterface<SPI>
+pub struct SPIInterface<SPI, IRQ = NoIRQ>
 where
     SPI: SpiDevice,
+    IRQ: IRQTraitAlias,
 {
     pub spi: SPI,
+    pub irq: Option<IRQ>,
+}
+
+impl<SPI, IRQ> SPIInterface<SPI, IRQ>
+where
+    SPI: SpiDevice,
+    IRQ: IRQTraitAlias,
+{
+    pub fn new(spi: SPI) -> Self {
+        Self {
+            spi,
+            irq: None::<IRQ>,
+        }
+    }
+
+    pub fn new_with_irq(spi: SPI, irq: IRQ) -> Self {
+        Self {
+            spi,
+            irq: Some(irq),
+        }
+    }
+}
+
+// #[cfg(not(feature = "is_sync"))]
+pub struct NoIRQ {}
+
+// #[cfg(not(feature = "is_sync"))]
+impl embedded_hal::digital::ErrorType for NoIRQ {
+    type Error = embedded_hal::digital::ErrorKind;
+}
+
+#[cfg(feature = "is_sync")]
+impl embedded_hal::digital::InputPin for NoIRQ {
+    fn is_high(&mut self) -> Result<bool, Self::Error> {
+        Ok(false)
+    }
+
+    fn is_low(&mut self) -> Result<bool, Self::Error> {
+        Ok(true)
+    }
+}
+
+#[cfg(not(feature = "is_sync"))]
+impl embedded_hal_async::digital::Wait for NoIRQ {
+    async fn wait_for_high(&mut self) -> Result<(), Self::Error> {
+        Ok(())
+    }
+
+    async fn wait_for_low(&mut self) -> Result<(), Self::Error> {
+        Ok(())
+    }
+
+    async fn wait_for_rising_edge(&mut self) -> Result<(), Self::Error> {
+        Ok(())
+    }
+
+    async fn wait_for_falling_edge(&mut self) -> Result<(), Self::Error> {
+        Ok(())
+    }
+
+    async fn wait_for_any_edge(&mut self) -> Result<(), Self::Error> {
+        Ok(())
+    }
 }
 
 #[maybe_async::maybe_async(AFIT)]
-impl<SPI> Interface for SPIInterface<SPI>
+impl<SPI, IRQ> Interface for SPIInterface<SPI, IRQ>
 where
     SPI: SpiDevice,
+    IRQ: IRQTraitAlias,
 {
     type Error = <SPI as embedded_hal::spi::ErrorType>::Error;
     async fn wake_up(&mut self) -> Result<(), Self::Error> {
@@ -75,26 +150,48 @@ where
 
     #[maybe_async::sync_impl]
     fn wait_ready(&mut self) -> Poll<Result<(), Self::Error>> {
-        let mut buf = [PN532_SPI_STATREAD, 0x00];
+        match self.irq {
+            Some(ref mut irq) => match irq.is_low() {
+                Ok(v) => {
+                    return if v {
+                        Poll::Ready(Ok(()))
+                    } else {
+                        Poll::Pending
+                    }
+                }
+                Err(_) => Poll::Ready(Ok(())), // TODO: deal with errors properly
+            },
+            None => {
+                let mut buf = [PN532_SPI_STATREAD, 0x00];
 
-        self.spi.transfer_in_place(&mut buf)?;
+                self.spi.transfer_in_place(&mut buf)?;
 
-        if buf[1] == PN532_SPI_READY {
-            Poll::Ready(Ok(()))
-        } else {
-            Poll::Pending
+                if buf[1] == PN532_SPI_READY {
+                    Poll::Ready(Ok(()))
+                } else {
+                    Poll::Pending
+                }
+            }
         }
     }
 
     #[maybe_async::async_impl]
     async fn wait_ready(&mut self) -> Result<(), Self::Error> {
-        let mut buf = [PN532_SPI_STATREAD, 0x00];
+        match self.irq {
+            Some(ref mut irq) => {
+                irq.wait_for_low().await.unwrap(); // TODO: deal with errors properly
+                Ok(())
+            }
+            None => {
+                let mut buf = [PN532_SPI_STATREAD, 0x00];
 
-        while buf[1] != PN532_SPI_READY {
-            buf = [PN532_SPI_STATREAD, 0x00];
-            self.spi.transfer_in_place(&mut buf).await?;
+                while buf[1] != PN532_SPI_READY {
+                    buf = [PN532_SPI_STATREAD, 0x00];
+                    self.spi.transfer_in_place(&mut buf).await?;
+                }
+                Ok(())
+            }
         }
-        Ok(())
     }
 
     async fn read(&mut self, buf: &mut [u8]) -> Result<(), Self::Error> {
@@ -183,33 +280,31 @@ mod tests {
 
     #[test]
     fn test_spi() {
-        let mut spi = SPIInterface {
-            spi: SpiMock::new(&[
-                // write
-                SpiTransaction::transaction_start(),
-                SpiTransaction::write(as_lsb(0x01)),
-                SpiTransaction::write_vec(vec![as_lsb(1), as_lsb(2)]),
-                SpiTransaction::transaction_end(),
-                // wait_ready
-                SpiTransaction::transaction_start(),
-                SpiTransaction::transfer_in_place(
-                    vec![as_lsb(0x02), as_lsb(0x00)],
-                    vec![as_lsb(0x00), as_lsb(0x00)],
-                ),
-                SpiTransaction::transaction_end(),
-                SpiTransaction::transaction_start(),
-                SpiTransaction::transfer_in_place(
-                    vec![as_lsb(0x02), as_lsb(0x00)],
-                    vec![as_lsb(0x00), as_lsb(0x01)],
-                ),
-                SpiTransaction::transaction_end(),
-                // read
-                SpiTransaction::transaction_start(),
-                SpiTransaction::write(as_lsb(0x03)),
-                SpiTransaction::read_vec(vec![as_lsb(3), as_lsb(4)]),
-                SpiTransaction::transaction_end(),
-            ]),
-        };
+        let mut spi = SPIInterface::new(SpiMock::new(&[
+            // write
+            SpiTransaction::transaction_start(),
+            SpiTransaction::write(as_lsb(0x01)),
+            SpiTransaction::write_vec(vec![as_lsb(1), as_lsb(2)]),
+            SpiTransaction::transaction_end(),
+            // wait_ready
+            SpiTransaction::transaction_start(),
+            SpiTransaction::transfer_in_place(
+                vec![as_lsb(0x02), as_lsb(0x00)],
+                vec![as_lsb(0x00), as_lsb(0x00)],
+            ),
+            SpiTransaction::transaction_end(),
+            SpiTransaction::transaction_start(),
+            SpiTransaction::transfer_in_place(
+                vec![as_lsb(0x02), as_lsb(0x00)],
+                vec![as_lsb(0x00), as_lsb(0x01)],
+            ),
+            SpiTransaction::transaction_end(),
+            // read
+            SpiTransaction::transaction_start(),
+            SpiTransaction::write(as_lsb(0x03)),
+            SpiTransaction::read_vec(vec![as_lsb(3), as_lsb(4)]),
+            SpiTransaction::transaction_end(),
+        ]));
 
         spi.write(&mut [1, 2]).unwrap();
 
