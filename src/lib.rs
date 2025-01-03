@@ -31,7 +31,7 @@
 //! # SPI example
 //! ```
 //! # use pn532::doc_test_helper::{NoOpSPI, NoOpTimer};
-//! use pn532::{requests::SAMMode, spi::SPIInterface, Pn532, Request};
+//! use pn532::{requests::SAMMode, spi::{ SPIInterface, NoIRQ}, Pn532, Request};
 //! use pn532::IntoDuration; // trait for `ms()`, your HAL might have its own
 //!
 //! # let spi = NoOpSPI;
@@ -40,7 +40,7 @@
 //! // spi is a struct implementing embedded_hal::spi::SpiDevice
 //! // timer is a struct implementing pn532::CountDown
 //!
-//! let mut pn532: Pn532<_, _, 32> = Pn532::new(SPIInterface { spi }, timer);
+//! let mut pn532: Pn532<_, _, 32> = Pn532::new(SPIInterface { spi, irq: None::<NoIRQ> }, timer);
 //! if let Err(e) = pn532.process(&Request::sam_configuration(SAMMode::Normal, false), 0, 50.ms()){
 //!     println!("Could not initialize PN532: {e:?}")
 //! }

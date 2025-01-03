@@ -27,6 +27,7 @@ embedded-hal-async = { version = "1.0.0" }
 maybe-async = { version = "0.2.10" }
 
 [features]
+default = ["is_sync"]
 msb-spi = []
 std = ["serialport"]
 is_sync = ["maybe-async/is_sync"]
@@ -37,7 +38,7 @@ rustdoc-args = ["--cfg", "docsrs"]
 
 [[example]]
 name = "hsu-test-util"
-required-features = ["std"]
+required-features = ["std", "is_sync"]
 
 [dev-dependencies]
 # hsu-test-serialport

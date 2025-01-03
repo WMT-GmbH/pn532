@@ -280,31 +280,34 @@ mod tests {
 
     #[test]
     fn test_spi() {
-        let mut spi = SPIInterface::new(SpiMock::new(&[
-            // write
-            SpiTransaction::transaction_start(),
-            SpiTransaction::write(as_lsb(0x01)),
-            SpiTransaction::write_vec(vec![as_lsb(1), as_lsb(2)]),
-            SpiTransaction::transaction_end(),
-            // wait_ready
-            SpiTransaction::transaction_start(),
-            SpiTransaction::transfer_in_place(
-                vec![as_lsb(0x02), as_lsb(0x00)],
-                vec![as_lsb(0x00), as_lsb(0x00)],
-            ),
-            SpiTransaction::transaction_end(),
-            SpiTransaction::transaction_start(),
-            SpiTransaction::transfer_in_place(
-                vec![as_lsb(0x02), as_lsb(0x00)],
-                vec![as_lsb(0x00), as_lsb(0x01)],
-            ),
-            SpiTransaction::transaction_end(),
-            // read
-            SpiTransaction::transaction_start(),
-            SpiTransaction::write(as_lsb(0x03)),
-            SpiTransaction::read_vec(vec![as_lsb(3), as_lsb(4)]),
-            SpiTransaction::transaction_end(),
-        ]));
+        let mut spi = SPIInterface {
+            spi: SpiMock::new(&[
+                // write
+                SpiTransaction::transaction_start(),
+                SpiTransaction::write(as_lsb(0x01)),
+                SpiTransaction::write_vec(vec![as_lsb(1), as_lsb(2)]),
+                SpiTransaction::transaction_end(),
+                // wait_ready
+                SpiTransaction::transaction_start(),
+                SpiTransaction::transfer_in_place(
+                    vec![as_lsb(0x02), as_lsb(0x00)],
+                    vec![as_lsb(0x00), as_lsb(0x00)],
+                ),
+                SpiTransaction::transaction_end(),
+                SpiTransaction::transaction_start(),
+                SpiTransaction::transfer_in_place(
+                    vec![as_lsb(0x02), as_lsb(0x00)],
+                    vec![as_lsb(0x00), as_lsb(0x01)],
+                ),
+                SpiTransaction::transaction_end(),
+                // read
+                SpiTransaction::transaction_start(),
+                SpiTransaction::write(as_lsb(0x03)),
+                SpiTransaction::read_vec(vec![as_lsb(3), as_lsb(4)]),
+                SpiTransaction::transaction_end(),
+            ]),
+            irq: None::<NoIRQ>,
+        };
 
         spi.write(&mut [1, 2]).unwrap();
 
