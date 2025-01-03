@@ -153,7 +153,7 @@ where
         match self.irq {
             Some(ref mut irq) => match irq.is_low() {
                 Ok(v) => {
-                    return if v {
+                    if v {
                         Poll::Ready(Ok(()))
                     } else {
                         Poll::Pending

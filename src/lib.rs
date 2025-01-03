@@ -85,7 +85,6 @@ pub mod spi;
 
 /// Abstraction over the different serial links.
 /// Either SPI, I2C or HSU (High Speed UART).
-
 #[cfg(feature = "is_sync")]
 pub trait Interface {
     /// Error specific to the serial link.
