@@ -23,7 +23,8 @@ serialport = { version = "4.0.1", optional = true }
 
 [features]
 msb-spi = []
-std = ["serialport"]
+serialport = ["dep:serialport", "std"]
+std = []
 
 [package.metadata.docs.rs]
 all-features = true

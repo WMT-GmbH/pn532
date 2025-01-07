@@ -57,8 +57,14 @@
 //! your peripheral cannot be set to **lsb mode** you need to enable the `msb-spi` feature of this crate.
 //!
 //! # `std` feature
-//! Enable the std feature to use [`serialport::SerialPortInterface`]
-//! Only works for [targets](https://github.com/serialport/serialport-rs#platform-support) supported by the `serialport` crate.
+//!
+//! Enable the std feature to use [`SysTimer`].
+//!
+//! # `serialport` feature
+//!
+//! Enable the serialport feature to use [`serialport::SerialPortInterface`].
+//! Only works for [targets](https://github.com/serialport/serialport-rs#platform-support) supported by the `serialport`
+//! crate.
 
 #![cfg_attr(not(any(feature = "std", doc, test)), no_std)]
 #![cfg_attr(docsrs, feature(doc_cfg))]
@@ -74,8 +80,8 @@ pub use nb;
 pub mod i2c;
 mod protocol;
 pub mod requests;
-#[cfg(feature = "std")]
-#[cfg_attr(docsrs, doc(cfg(feature = "std")))]
+#[cfg(feature = "serialport")]
+#[cfg_attr(docsrs, doc(cfg(feature = "serialport")))]
 pub mod serialport;
 pub mod spi;
 
@@ -261,6 +267,58 @@ impl IntoDuration for u64 {
     }
     fn us(self) -> Duration {
         Duration::from_micros(self)
+    }
+}
+
+#[cfg(feature = "std")]
+#[cfg_attr(docsrs, doc(cfg(feature = "std")))]
+pub use systimer::SysTimer;
+
+#[cfg(feature = "std")]
+mod systimer {
+    use crate::CountDown;
+    use core::convert::Infallible;
+    use std::time::{Duration, Instant};
+
+    /// A timer based on [`std::time::Instant`](Instant)
+    pub struct SysTimer {
+        start: Instant,
+        duration: Duration,
+    }
+
+    impl SysTimer {
+        pub fn new() -> SysTimer {
+            SysTimer {
+                start: Instant::now(),
+                duration: Duration::from_millis(0),
+            }
+        }
+    }
+
+    impl Default for SysTimer {
+        fn default() -> SysTimer {
+            SysTimer::new()
+        }
+    }
+
+    impl CountDown for SysTimer {
+        type Time = Duration;
+
+        fn start<T>(&mut self, count: T)
+        where
+            T: Into<Self::Time>,
+        {
+            self.start = Instant::now();
+            self.duration = count.into();
+        }
+
+        fn wait(&mut self) -> nb::Result<(), Infallible> {
+            if (Instant::now() - self.start) >= self.duration {
+                Ok(())
+            } else {
+                Err(nb::Error::WouldBlock)
+            }
+        }
     }
 }
 

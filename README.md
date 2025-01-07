@@ -57,8 +57,12 @@ If you want to use either `spi::SPIInterface` or `spi::SPIInterfaceWithIrq` and
 your peripheral cannot be set to **lsb mode** you need to enable the `msb-spi` feature of this crate.
 
 ## `std` feature
-Enable the std feature to use `serialport::SerialPortInterface`. 
-Only works for [targets](https://github.com/serialport/serialport-rs#platform-support) supported by the `serialport` crate.
+Enable the std feature to use `SysTimer`.
+
+## `serialport` feature
+Enable the serialport feature to use `serialport::SerialPortInterface`.
+Only works for [targets](https://github.com/serialport/serialport-rs#platform-support) supported by the `serialport`
+crate.
 
 #### License
 <sup>

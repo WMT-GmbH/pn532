@@ -1,12 +1,8 @@
 //! SerialPort interface
 
-use core::convert::Infallible;
 use core::task::Poll;
-use std::io::Write;
-use std::time::{Duration, Instant};
-
-use crate::protocol::CountDown;
 use serialport::SerialPort;
+use std::io::Write;
 
 use crate::Interface;
 
@@ -43,46 +39,5 @@ impl SerialPortInterface {
             0x55, 0x55, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
             0x00, 0x00,
         ])
-    }
-}
-
-/// A timer based on [`std::time::Instant`], which is a monotonically nondecreasing clock.
-pub struct SysTimer {
-    start: Instant,
-    duration: Duration,
-}
-
-impl SysTimer {
-    pub fn new() -> SysTimer {
-        SysTimer {
-            start: Instant::now(),
-            duration: Duration::from_millis(0),
-        }
-    }
-}
-
-impl Default for SysTimer {
-    fn default() -> SysTimer {
-        SysTimer::new()
-    }
-}
-
-impl CountDown for SysTimer {
-    type Time = Duration;
-
-    fn start<T>(&mut self, count: T)
-    where
-        T: Into<Self::Time>,
-    {
-        self.start = Instant::now();
-        self.duration = count.into();
-    }
-
-    fn wait(&mut self) -> nb::Result<(), Infallible> {
-        if (Instant::now() - self.start) >= self.duration {
-            Ok(())
-        } else {
-            Err(nb::Error::WouldBlock)
-        }
     }
 }
