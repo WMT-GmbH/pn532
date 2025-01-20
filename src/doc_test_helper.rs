@@ -9,12 +9,12 @@ use crate::Pn532;
 
 /// used for doc tests
 pub fn get_pn532() -> Pn532<SPIInterface<NoOpSPI>, NoOpTimer> {
-    Pn532::new(SPIInterface { spi: NoOpSPI }, NoOpTimer)
+    Pn532::new(SPIInterface::new(NoOpSPI), NoOpTimer)
 }
 
 /// used for doc tests
 pub fn get_async_pn532() -> Pn532<SPIInterface<NoOpSPI>, ()> {
-    Pn532::new(SPIInterface { spi: NoOpSPI }, ())
+    Pn532::new(SPIInterface::new(NoOpSPI), ())
 }
 
 pub struct NoOpSPI;

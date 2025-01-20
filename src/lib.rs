@@ -31,7 +31,7 @@
 //! # SPI example
 //! ```
 //! # use pn532::doc_test_helper::{NoOpSPI, NoOpTimer};
-//! use pn532::{requests::SAMMode, spi::SPIInterface, Pn532, Request};
+//! use pn532::{requests::SAMMode, spi::{ SPIInterface, NoIRQ}, Pn532, Request};
 //! use pn532::IntoDuration; // trait for `ms()`, your HAL might have its own
 //!
 //! # let spi = NoOpSPI;
@@ -40,7 +40,7 @@
 //! // spi is a struct implementing embedded_hal::spi::SpiDevice
 //! // timer is a struct implementing pn532::CountDown
 //!
-//! let mut pn532: Pn532<_, _, 32> = Pn532::new(SPIInterface { spi }, timer);
+//! let mut pn532: Pn532<_, _, 32> = Pn532::new(SPIInterface { spi, irq: None::<NoIRQ> }, timer);
 //! if let Err(e) = pn532.process(&Request::sam_configuration(SAMMode::Normal, false), 0, 50.ms()){
 //!     println!("Could not initialize PN532: {e:?}")
 //! }
@@ -64,6 +64,7 @@
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
 use core::fmt::Debug;
+#[cfg(feature = "is_sync")]
 use core::task::Poll;
 use core::time::Duration;
 
@@ -72,15 +73,19 @@ pub use crate::requests::Request;
 pub use nb;
 
 pub mod i2c;
+// pub mod i2c_async;
 mod protocol;
 pub mod requests;
 #[cfg(feature = "std")]
 #[cfg_attr(docsrs, doc(cfg(feature = "std")))]
+#[cfg(feature = "is_sync")]
 pub mod serialport;
+
 pub mod spi;
 
 /// Abstraction over the different serial links.
 /// Either SPI, I2C or HSU (High Speed UART).
+#[cfg(feature = "is_sync")]
 pub trait Interface {
     /// Error specific to the serial link.
     type Error: Debug;
@@ -96,23 +101,107 @@ pub trait Interface {
     /// Reads data from the Pn532 into `buf`.
     /// This method will only be called if `wait_ready` returned `Poll::Ready(Ok(()))` before.
     fn read(&mut self, buf: &mut [u8]) -> Result<(), Self::Error>;
+    /// Wakes up the PN532 prior to first communication, in case of SPI
+    fn wake_up(&mut self) -> Result<(), Self::Error>;
 }
 
+#[cfg(not(feature = "is_sync"))]
+pub trait Interface {
+    /// Error specific to the serial link.
+    type Error: Debug;
+    /// Writes a `frame` to the Pn532
+    // async fn write(&mut self, frame: &[u8]) -> Result<(), Self::Error>;
+    fn write(
+        &mut self,
+        frame: &mut [u8],
+    ) -> impl core::future::Future<Output = Result<(), Self::Error>>;
+    /// Checks if the Pn532 has data to be read.
+    /// Uses either the serial link or the IRQ pin.
+    // async fn wait_ready(&mut self) -> Result<(), Self::Error>;
+    fn wait_ready(&mut self) -> impl core::future::Future<Output = Result<(), Self::Error>>;
+    /// Reads data from the Pn532 into `buf`.
+    /// This method will only be called if `wait_ready` returned `Poll::Ready(Ok(()))` before.
+    // async fn read(&mut self, buf: &mut [u8]) -> Result<(), Self::Error>;
+    fn read(
+        &mut self,
+        buf: &mut [u8],
+    ) -> impl core::future::Future<Output = Result<(), Self::Error>>;
+    fn wake_up(&mut self) -> impl core::future::Future<Output = Result<(), Self::Error>>;
+}
+
+// This is how I'd want to define it with maybe_async, but it generates warnings, maybe better to just disable them?
+// #[maybe_async::maybe_async(AFIT)]
+// pub trait Interface {
+//     /// Error specific to the serial link.
+//     type Error: Debug;
+//     /// Writes a `frame` to the Pn532
+//     async fn write(&mut self, frame: &[u8]) -> Result<(), Self::Error>;
+//     /// Checks if the Pn532 has data to be read.
+//     /// Uses either the serial link or the IRQ pin.
+//     #[cfg(not(feature = "is_sync"))]
+//     async fn wait_ready(&mut self) -> Result<(), Self::Error>;
+//     #[cfg(feature = "is_sync")]
+//     fn wait_ready(&mut self) -> Poll<Result<(), Self::Error>>;
+//     /// Reads data from the Pn532 into `buf`.
+//     /// This method will only be called if `wait_ready` returned `Poll::Ready(Ok(()))` before.
+//     async fn read(&mut self, buf: &mut [u8]) -> Result<(), Self::Error>;
+// }
+
+#[maybe_async::maybe_async(AFIT)]
 impl<I: Interface> Interface for &mut I {
     type Error = I::Error;
 
-    fn write(&mut self, frame: &mut [u8]) -> Result<(), Self::Error> {
-        I::write(self, frame)
+    async fn wake_up(&mut self) -> Result<(), Self::Error> {
+        I::wake_up(self).await
     }
 
+    async fn write(&mut self, frame: &mut [u8]) -> Result<(), Self::Error> {
+        I::write(self, frame).await
+    }
+
+    #[maybe_async::async_impl]
+    async fn wait_ready(&mut self) -> Result<(), Self::Error> {
+        I::wait_ready(self).await
+    }
+    #[maybe_async::sync_impl]
     fn wait_ready(&mut self) -> Poll<Result<(), Self::Error>> {
-        I::wait_ready(self)
+        I::wait_ready(self).await
     }
 
-    fn read(&mut self, buf: &mut [u8]) -> Result<(), Self::Error> {
-        I::read(self, buf)
+    async fn read(&mut self, buf: &mut [u8]) -> Result<(), Self::Error> {
+        I::read(self, buf).await
     }
 }
+
+// pub trait InterfaceAsync {
+//     /// Error specific to the serial link.
+//     type Error: Debug;
+//     /// Writes a `frame` to the Pn532
+//     async fn write(&mut self, frame: &[u8]) -> Result<(), Self::Error>;
+//     /// Checks if the Pn532 has data to be read.
+//     /// Uses either the serial link or the IRQ pin.
+//     async fn wait_ready(&mut self) -> Poll<Result<(), Self::Error>>;
+//     /// Reads data from the Pn532 into `buf`.
+//     /// This method will only be called if `wait_ready` returned `Poll::Ready(Ok(()))` before.
+//     async fn read(&mut self, buf: &mut [u8]) -> Result<(), Self::Error>;
+// }
+//
+//
+// impl<I: InterfaceAsync> InterfaceAsync for &mut I {
+//     type Error = I::Error;
+//
+//     async fn write(&mut self, frame: &[u8]) -> Result<(), Self::Error> {
+//         I::write(self, frame).await
+//     }
+//
+//      async fn wait_ready(&mut self) -> Poll<Result<(), Self::Error>> {
+//         I::wait_ready(self).await
+//     }
+//
+//     async fn read(&mut self, buf: &mut [u8]) -> Result<(), Self::Error> {
+//         I::read(self, buf).await
+//     }
+// }
 
 /// Some commands return a status byte.
 /// If this byte is not zero it will contain an `ErrorCode`.
@@ -266,4 +355,5 @@ impl IntoDuration for u64 {
 
 #[doc(hidden)]
 // FIXME: #[cfg(doctest)] once https://github.com/rust-lang/rust/issues/67295 is fixed.
+#[cfg(feature = "is_sync")]
 pub mod doc_test_helper;

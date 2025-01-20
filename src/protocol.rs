@@ -2,10 +2,11 @@ use crate::{
     requests::{BorrowedRequest, Command},
     Interface,
 };
+#[cfg(feature = "is_sync")]
+use core::convert::Infallible;
+use core::{fmt::Debug, future::Future};
+#[cfg(feature = "is_sync")]
 use core::{
-    convert::Infallible,
-    fmt::Debug,
-    future::Future,
     pin::Pin,
     task::{Context, Poll},
 };
@@ -123,10 +124,26 @@ pub trait CountDown {
         T: Into<Self::Time>;
 
     /// Non-blockingly "waits" until the count-down finishes
+    #[cfg(feature = "is_sync")]
     fn wait(&mut self) -> nb::Result<(), Infallible>;
+
+    #[cfg(not(feature = "is_sync"))]
+    fn until_timeout<F: Future>(
+        &self,
+        fut: F,
+    ) -> impl core::future::Future<Output = Result<F::Output, embassy_time::TimeoutError>>;
+    // async fn until_timeout<F: Future>(&self, fut: F) -> Result<F::Output, Self::Error>;
 }
 
+#[maybe_async::maybe_async(AFIT)]
 impl<I: Interface, T: CountDown, const N: usize> Pn532<I, T, N> {
+    /// Wake up the PN532 prior to any other interaction with it
+    /// Required when using SPI.
+    #[inline]
+    pub async fn wake_up(&mut self) -> Result<(), I::Error> {
+        self.interface.wake_up().await
+    }
+
     /// Send a request, wait for an ACK and then wait for a response.
     ///
     /// `response_len` is the largest expected length of the returned data.
@@ -140,16 +157,18 @@ impl<I: Interface, T: CountDown, const N: usize> Pn532<I, T, N> {
     /// let result = pn532.process(&Request::GET_FIRMWARE_VERSION, 4, 50.ms());
     /// ```
     #[inline]
-    pub fn process<'a>(
+    pub async fn process<'a>(
         &mut self,
         request: impl Into<BorrowedRequest<'a>>,
         response_len: usize,
         timeout: T::Time,
     ) -> Result<&[u8], Error<I::Error>> {
         // codegen trampoline: https://github.com/rust-lang/rust/issues/77960
-        self._process(request.into(), response_len, timeout)
+        self._process(request.into(), response_len, timeout).await
     }
-    fn _process(
+
+    // #[maybe_async::async_impl]
+    async fn _process(
         &mut self,
         request: BorrowedRequest<'_>,
         response_len: usize,
@@ -157,19 +176,21 @@ impl<I: Interface, T: CountDown, const N: usize> Pn532<I, T, N> {
     ) -> Result<&[u8], Error<I::Error>> {
         let sent_command = request.command;
         self.timer.start(timeout);
-        self._send(request)?;
-        while self.interface.wait_ready()?.is_pending() {
-            if self.timer.wait().is_ok() {
-                return Err(Error::TimeoutAck);
-            }
+        self._send(request).await?;
+        // if self.timer.until_timeout(self.interface.wait_ready()).await.is_err() {
+        //     return Err(Error::TimeoutAck);
+        // }
+        if self._wait_ready().await.is_err() {
+            return Err(Error::TimeoutAck);
         }
-        self.receive_ack()?;
-        while self.interface.wait_ready()?.is_pending() {
-            if self.timer.wait().is_ok() {
-                return Err(Error::TimeoutResponse);
-            }
+        self.receive_ack().await?;
+        if self._wait_ready().await.is_err() {
+            return Err(Error::TimeoutResponse);
         }
-        self.receive_response(sent_command, response_len)
+        // if self.timer.until_timeout(self.interface.wait_ready()).await.is_err() {
+        //     return Err(Error::TimeoutResponse);
+        // }
+        self.receive_response(sent_command, response_len).await
     }
 
     /// Send a request and wait for an ACK.
@@ -183,29 +204,54 @@ impl<I: Interface, T: CountDown, const N: usize> Pn532<I, T, N> {
     /// pn532.process_no_response(&Request::INLIST_ONE_ISO_A_TARGET, 5.ms());
     /// ```
     #[inline]
-    pub fn process_no_response<'a>(
+    pub async fn process_no_response<'a>(
         &mut self,
         request: impl Into<BorrowedRequest<'a>>,
         timeout: T::Time,
     ) -> Result<(), Error<I::Error>> {
         // codegen trampoline: https://github.com/rust-lang/rust/issues/77960
-        self._process_no_response(request.into(), timeout)
+        self._process_no_response(request.into(), timeout).await
     }
-    fn _process_no_response(
+
+    async fn _process_no_response(
         &mut self,
         request: BorrowedRequest<'_>,
         timeout: T::Time,
     ) -> Result<(), Error<I::Error>> {
         self.timer.start(timeout);
-        self._send(request)?;
+        self._send(request).await?;
+        if self._wait_ready().await.is_err() {
+            return Err(Error::TimeoutAck);
+        }
+        self.receive_ack().await
+    }
+
+    // Wait for ready byte from pn532
+    //
+    // This is different between sync and async implementations in a way that
+    // requires different functions, sync use a busy wait loop,  async use
+    // underlying async timer mechanism as provided by the caller
+
+    #[maybe_async::async_impl]
+    async fn _wait_ready(&mut self) -> Result<(), Error<I::Error>> {
+        match self.timer.until_timeout(self.interface.wait_ready()).await {
+            Err(_) => Err(Error::TimeoutResponse),
+            _ => Ok(()),
+        }
+    }
+
+    #[maybe_async::sync_impl]
+    fn _wait_ready(&mut self) -> Result<(), Error<I::Error>> {
         while self.interface.wait_ready()?.is_pending() {
             if self.timer.wait().is_ok() {
-                return Err(Error::TimeoutAck);
+                return Err(Error::TimeoutResponse);
             }
         }
-        self.receive_ack()
+        Ok(())
     }
 }
+
+#[maybe_async::maybe_async(AFIT)]
 impl<I: Interface, T, const N: usize> Pn532<I, T, N> {
     /// Create a Pn532 instance
     pub fn new(interface: I, timer: T) -> Self {
@@ -226,14 +272,14 @@ impl<I: Interface, T, const N: usize> Pn532<I, T, N> {
     /// pn532.send(&Request::GET_FIRMWARE_VERSION);
     /// ```
     #[inline]
-    pub fn send<'a>(
+    pub async fn send<'a>(
         &mut self,
         request: impl Into<BorrowedRequest<'a>>,
     ) -> Result<(), Error<I::Error>> {
         // codegen trampoline: https://github.com/rust-lang/rust/issues/77960
-        self._send(request.into())
+        self._send(request.into()).await
     }
-    fn _send(&mut self, request: BorrowedRequest<'_>) -> Result<(), Error<I::Error>> {
+    async fn _send(&mut self, request: BorrowedRequest<'_>) -> Result<(), Error<I::Error>> {
         let data_len = request.data.len();
         let frame_len = 2 + data_len as u8; // frame identifier + command + data
 
@@ -259,7 +305,7 @@ impl<I: Interface, T, const N: usize> Pn532<I, T, N> {
         self.buf[7 + data_len] = to_checksum(data_sum);
         self.buf[8 + data_len] = POSTAMBLE;
 
-        self.interface.write(&mut self.buf[..9 + data_len])?;
+        self.interface.write(&mut self.buf[..9 + data_len]).await?;
         Ok(())
     }
 
@@ -278,9 +324,9 @@ impl<I: Interface, T, const N: usize> Pn532<I, T, N> {
     ///     pn532.receive_ack();
     /// }
     /// ```
-    pub fn receive_ack(&mut self) -> Result<(), Error<I::Error>> {
+    pub async fn receive_ack(&mut self) -> Result<(), Error<I::Error>> {
         let mut ack_buf = [0; 6];
-        self.interface.read(&mut ack_buf)?;
+        self.interface.read(&mut ack_buf).await?;
         if ack_buf != ACK {
             Err(Error::BadAck)
         } else {
@@ -310,14 +356,14 @@ impl<I: Interface, T, const N: usize> Pn532<I, T, N> {
     ///     let result = pn532.receive_response(Request::GET_FIRMWARE_VERSION.command, 4);
     /// }
     /// ```
-    pub fn receive_response(
+    pub async fn receive_response(
         &mut self,
         sent_command: Command,
         response_len: usize,
     ) -> Result<&[u8], Error<I::Error>> {
         let response_buf = &mut self.buf[..response_len + 9];
         response_buf.fill(0); // zero out buf
-        self.interface.read(response_buf)?;
+        self.interface.read(response_buf).await?;
         let expected_response_command = sent_command as u8 + 1;
         parse_response(response_buf, expected_response_command)
     }
@@ -326,13 +372,14 @@ impl<I: Interface, T, const N: usize> Pn532<I, T, N> {
     /// In that case, the PN532 discontinues the last processing and does not answer anything
     /// to the host controller.
     /// Then, the PN532 starts again waiting for a new command.
-    pub fn abort(&mut self) -> Result<(), Error<I::Error>> {
+    pub async fn abort(&mut self) -> Result<(), Error<I::Error>> {
         #[allow(const_item_mutation)]
-        self.interface.write(&mut ACK)?;
+        self.interface.write(&mut ACK).await?;
         Ok(())
     }
 }
 
+#[maybe_async::sync_impl]
 impl<I: Interface, const N: usize> Pn532<I, (), N> {
     /// Create a Pn532 instance without a timer
     pub fn new_async(interface: I) -> Self {
@@ -452,10 +499,12 @@ fn parse_response<E: Debug>(
     Ok(&response_buf[7..5 + frame_len as usize])
 }
 
+#[maybe_async::sync_impl]
 struct WaitReadyFuture<'a, I> {
     interface: &'a mut I,
 }
 
+#[maybe_async::sync_impl]
 impl<I: Interface> Future for WaitReadyFuture<'_, I> {
     type Output = Result<(), I::Error>;
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {

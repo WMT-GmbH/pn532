@@ -18,12 +18,19 @@ keywords = [
 
 [dependencies]
 embedded-hal = { version = "1.0.0" }
-nb = "1.1.0"
+embassy-time = { version = "0.4.0" }
+
+nb = { version = "1.0.0" }
 serialport = { version = "4.0.1", optional = true }
 
+embedded-hal-async = { version = "1.0.0" }
+maybe-async = { version = "0.2.10" }
+
 [features]
+default = ["is_sync"]
 msb-spi = []
 std = ["serialport"]
+is_sync = ["maybe-async/is_sync"]
 
 [package.metadata.docs.rs]
 all-features = true
@@ -31,7 +38,7 @@ rustdoc-args = ["--cfg", "docsrs"]
 
 [[example]]
 name = "hsu-test-util"
-required-features = ["std"]
+required-features = ["std", "is_sync"]
 
 [dev-dependencies]
 # hsu-test-serialport
