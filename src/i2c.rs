@@ -33,6 +33,8 @@ where
     }
 
     fn wait_ready(&mut self) -> Poll<Result<(), Self::Error>> {
+        // Wait for RDY byte to be 1
+        // See 6.2.4 I2C communication statement
         let mut buf = [0];
         if let Err(e) = self.i2c.read(I2C_ADDRESS, &mut buf) {
             // It's possible that the PN532 does not ACK the read request when it is not ready.
@@ -54,7 +56,10 @@ where
     fn read(&mut self, buf: &mut [u8]) -> Result<(), Self::Error> {
         self.i2c.transaction(
             I2C_ADDRESS,
-            &mut [Operation::Read(&mut [0]), Operation::Read(buf)],
+            &mut [
+                Operation::Read(&mut [0]),  // Strip RDY byte off the response
+                Operation::Read(buf)
+            ],
         )
     }
 }
