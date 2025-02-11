@@ -57,8 +57,8 @@ where
         self.i2c.transaction(
             I2C_ADDRESS,
             &mut [
-                Operation::Read(&mut [0]),  // Strip RDY byte off the response
-                Operation::Read(buf)
+                Operation::Read(&mut [0]), // Strip RDY byte off the response
+                Operation::Read(buf),
             ],
         )
     }
